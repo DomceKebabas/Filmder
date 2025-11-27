@@ -108,6 +108,9 @@ public class HigherLowerController : ControllerBase
 
         if (game.CurrentMovie == null || game.NextMovie == null)
             return BadRequest(new { message = "Game state is incorrect" });
+        
+        var guessedMovieRating = game.NextMovie.Rating;
+        var guessedMovie = game.NextMovie;
 
         bool isCorrect = false;
         if (dto.Guess == "higher")
@@ -132,13 +135,12 @@ public class HigherLowerController : ControllerBase
             if (game.CurrentStreak > game.BestStreak)
                 game.BestStreak = game.CurrentStreak;
 
-            var newCurrentMovie = game.NextMovie;
+            var newCurrentMovie = guessedMovie;
             
             var newNextMovie = await GetRandomMovie(excludeIds: new[] { newCurrentMovie.Id });
 
             if (newNextMovie == null)
             {
-
                 game.IsActive = false;
                 game.EndedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
@@ -146,7 +148,7 @@ public class HigherLowerController : ControllerBase
                 return Ok(new GuessResultDto
                 {
                     WasCorrect = true,
-                    ActualRating = game.NextMovie.Rating,
+                    ActualRating = guessedMovieRating,
                     CurrentStreak = game.CurrentStreak,
                     BestStreak = game.BestStreak,
                     GameOver = true,
@@ -162,7 +164,7 @@ public class HigherLowerController : ControllerBase
             var response = new GuessResultDto
             {
                 WasCorrect = true,
-                ActualRating = game.NextMovie.Rating,
+                ActualRating = guessedMovieRating,
                 CurrentStreak = game.CurrentStreak,
                 BestStreak = game.BestStreak,
                 GameOver = false,
@@ -192,7 +194,6 @@ public class HigherLowerController : ControllerBase
         }
         else 
         {
-            // Wrong guess - end game
             game.IsActive = false;
             game.EndedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
@@ -200,7 +201,7 @@ public class HigherLowerController : ControllerBase
             return Ok(new GuessResultDto
             {
                 WasCorrect = false,
-                ActualRating = game.NextMovie.Rating,
+                ActualRating = guessedMovieRating,
                 CurrentStreak = game.CurrentStreak,
                 BestStreak = game.BestStreak,
                 GameOver = true,
