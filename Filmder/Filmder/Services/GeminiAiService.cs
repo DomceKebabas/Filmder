@@ -15,7 +15,7 @@ public class GeminiAiService : IAIService
         _apiKey = config["Gemini:ApiKey"] ?? throw new Exception("API Key is missing");
     }
 
-   
+
     public async Task<string> GenerateText(string prompt)
     {
         var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
@@ -47,7 +47,7 @@ public class GeminiAiService : IAIService
         return CleanAiResponse(raw);
     }
 
-   
+
     private string CleanAiResponse(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -58,31 +58,31 @@ public class GeminiAiService : IAIService
             .Replace("```", "")
             .Trim();
     }
-    
 
-public Task<string> EmojiSequence(Difficulty difficulty)
-{
-    var randomSeed = DateTime.UtcNow.Ticks % 10000;
-    var random = new Random((int)randomSeed);
-    
-    var eraIndex = random.Next(0, 6);
-    var genreIndex = random.Next(0, 8);
-    
-    var eras = new[] { "1990s", "2000s", "2010s", "2020s", "1980s", "2015-2023" };
-    var genres = new[] { "Action", "Comedy", "Drama", "Thriller", "Sci-Fi", "Horror", "Romance", "Animation" };
-    
-    var targetEra = eras[eraIndex];
-    var targetGenre = genres[genreIndex];
-    
-    var bannedMovies = difficulty switch
+
+    public Task<string> EmojiSequence(Difficulty difficulty)
     {
-        Difficulty.Easy => "Frozen, Toy Story, Finding Nemo, The Lion King",
-        Difficulty.Medium => "Truman Show, The Social Network",
-        Difficulty.Hard => "The Godfather",
-        _ => ""
-    };
+        var randomSeed = DateTime.UtcNow.Ticks % 10000;
+        var random = new Random((int)randomSeed);
 
-    string prompt = $@"
+        var eraIndex = random.Next(0, 6);
+        var genreIndex = random.Next(0, 8);
+
+        var eras = new[] { "1990s", "2000s", "2010s", "2020s", "1980s", "2015-2023" };
+        var genres = new[] { "Action", "Comedy", "Drama", "Thriller", "Sci-Fi", "Horror", "Romance", "Animation" };
+
+        var targetEra = eras[eraIndex];
+        var targetGenre = genres[genreIndex];
+
+        var bannedMovies = difficulty switch
+        {
+            Difficulty.Easy => "Frozen, Toy Story, Finding Nemo, The Lion King",
+            Difficulty.Medium => "Truman Show, The Social Network",
+            Difficulty.Hard => "The Godfather",
+            _ => ""
+        };
+
+        string prompt = $@"
         You are generating content for a movie-guessing game.
 
         RANDOMIZATION SEED: {randomSeed}
@@ -229,19 +229,19 @@ public Task<string> EmojiSequence(Difficulty difficulty)
         Remember: Use the seed and target era/genre to ensure you pick a DIFFERENT movie than last time!
         ";
 
-    return GenerateText(prompt);
-}
+        return GenerateText(prompt);
+    }
 
-public async Task<PersonalityMatchResultDto> MatchPersonalityToCharacters(PersonalityQuizSubmissionDto submission)
-{
-    var answersText = string.Join("\n", submission.Answers.Select((a, i) => 
-        $"Question {a.QuestionId}: {a.Answer}"));
-    
-    var randomSeed = DateTime.UtcNow.Ticks % 1000000;
-    var answerHash = string.Join("", submission.Answers.Select(a => a.Answer)).GetHashCode();
-    var diversitySeed = (randomSeed + answerHash) % 100;
+    public async Task<PersonalityMatchResultDto> MatchPersonalityToCharacters(PersonalityQuizSubmissionDto submission)
+    {
+        var answersText = string.Join("\n", submission.Answers.Select((a, i) =>
+            $"Question {a.QuestionId}: {a.Answer}"));
 
-    string prompt = $@"
+        var randomSeed = DateTime.UtcNow.Ticks % 1000000;
+        var answerHash = string.Join("", submission.Answers.Select(a => a.Answer)).GetHashCode();
+        var diversitySeed = (randomSeed + answerHash) % 100;
+
+        string prompt = $@"
     You are a personality analyzer that matches users to movie/TV characters based on their quiz answers.
 
     USER'S QUIZ ANSWERS:
@@ -365,30 +365,30 @@ public async Task<PersonalityMatchResultDto> MatchPersonalityToCharacters(Person
     You must return 5 characters!
     ";
 
-    string raw = await GenerateText(prompt);
-    
-    var settings = new JsonSerializerOptions
-    {
-        PropertyNameCaseInsensitive = true
-    };
+        string raw = await GenerateText(prompt);
 
-    try
-    {
-        var result = JsonSerializer.Deserialize<PersonalityMatchResultDto>(raw, settings);
-        return result ?? new PersonalityMatchResultDto();
-    }
-    catch (JsonException ex)
-    {
-        Console.WriteLine($"Failed to parse AI response: {ex.Message}");
-        Console.WriteLine($"Raw response: {raw}");
-        
-        return new PersonalityMatchResultDto
+        var settings = new JsonSerializerOptions
         {
-            PersonalityProfile = "Unable to analyze personality at this time. Please try again.",
-            Matches = new List<CharacterMatchDto>()
+            PropertyNameCaseInsensitive = true
         };
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<PersonalityMatchResultDto>(raw, settings);
+            return result ?? new PersonalityMatchResultDto();
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse AI response: {ex.Message}");
+            Console.WriteLine($"Raw response: {raw}");
+
+            return new PersonalityMatchResultDto
+            {
+                PersonalityProfile = "Unable to analyze personality at this time. Please try again.",
+                Matches = new List<CharacterMatchDto>()
+            };
+        }
     }
-}
 
     private EmojiPuzzleDto? ParseMovieJson(string json)
     {
@@ -399,13 +399,257 @@ public async Task<PersonalityMatchResultDto> MatchPersonalityToCharacters(Person
 
         return JsonSerializer.Deserialize<EmojiPuzzleDto>(json, settings);
     }
-    
+
     public async Task<EmojiPuzzleDto?> EmojiSequenceParsed(Difficulty difficulty)
     {
         string raw = await EmojiSequence(difficulty);
         return ParseMovieJson(raw);
     }
+
+    public async Task<TasteExplanationDto> ExplainUserTaste(List<UserMovieTasteDto> watchedMovies)
+    {
+        if (!watchedMovies.Any())
+        {
+            return new TasteExplanationDto
+            {
+                OverallTasteProfile = "Not enough data to analyze your taste yet. Watch and rate more movies!",
+                WatchingPersonality = "Explorer - Still discovering your preferences"
+            };
+        }
+
+        var moviesText = string.Join("\n", watchedMovies.Select(m =>
+            $"- {m.MovieName} ({m.ReleaseYear}) - Genre: {m.Genre}, Director: {m.Director}, Your Rating: {m.UserRating}/10{(string.IsNullOrEmpty(m.UserComment) ? "" : $", Comment: \"{m.UserComment}\"")}"));
+
+        var randomSeed = DateTime.UtcNow.Ticks % 100000;
+
+        string prompt = $@"
+        You are a film critic and psychologist analyzing a user's movie taste based on their viewing history and ratings.
+
+        USER'S WATCHED MOVIES AND RATINGS:
+        {moviesText}
+
+        ANALYSIS SEED: {randomSeed}
+
+        YOUR TASK:
+        Provide a deep, insightful analysis of this user's movie taste. Be specific, thoughtful, and reference their actual movies.
+
+        ANALYSIS REQUIREMENTS:
+        1. Overall Taste Profile: 2-3 sentences summarizing their cinematic preferences
+        2. Provide 4-6 specific insights about their taste in different categories
+        3. Identify 3-5 favorite themes that appear across their movies
+        4. List 2-4 preferred directors if patterns emerge
+        5. Define their ""Watching Personality"" (e.g., ""The Intellectual Explorer"", ""The Emotional Storyteller"", ""The Thrill Seeker"")
+
+        INSIGHT CATEGORIES (choose 4-6 most relevant):
+        - Genre Preferences
+        - Directorial Style
+        - Narrative Complexity
+        - Emotional Tone
+        - Time Period Preferences
+        - Character Development Focus
+        - Cinematography Appreciation
+        - Thematic Interests
+        - Cultural Perspectives
+        - Pacing Preferences
+
+        IMPORTANT RULES:
+        - Reference SPECIFIC movies from their list in your explanations
+        - Notice patterns in their high vs low ratings
+        - If they rated something low, mention what they might not enjoy
+        - Be personal and insightful, not generic
+        - Connect their movie preferences to deeper personality traits
+        - Mention if they have eclectic taste vs. focused preferences
+
+        JSON FORMAT (MANDATORY):
+        {{
+        ""overallTasteProfile"": ""2-3 sentence summary that references specific movies they watched"",
+        ""insights"": [
+            {{
+            ""category"": ""Genre Preferences"",
+            ""explanation"": ""Detailed explanation referencing specific movies and ratings"",
+            ""exampleMovies"": [""Movie1"", ""Movie2"", ""Movie3""]
+            }},
+            {{
+            ""category"": ""Another Category"",
+            ""explanation"": ""Another specific insight"",
+            ""exampleMovies"": [""Movie4"", ""Movie5""]
+            }}
+        ],
+        ""favoriteThemes"": [""Theme 1"", ""Theme 2"", ""Theme 3""],
+        ""preferredDirectors"": [""Director 1"", ""Director 2""],
+        ""watchingPersonality"": ""Creative personality type name with 1 sentence explanation""
+        }}
+
+        OUTPUT RULES:
+        - Output ONLY valid JSON
+        - No markdown, no code blocks, no extra text
+        - Reference actual movies from the user's list
+        - Make it personal and insightful
+        - 4-6 insights minimum
+
+        Now analyze this user's taste with depth and specificity!
+        ";
+
+        string raw = await GenerateText(prompt);
+
+        var settings = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<TasteExplanationDto>(raw, settings);
+            return result ?? new TasteExplanationDto
+            {
+                OverallTasteProfile = "Unable to analyze taste at this time.",
+                WatchingPersonality = "Analysis pending"
+            };
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse taste explanation: {ex.Message}");
+            Console.WriteLine($"Raw response: {raw}");
+
+            return new TasteExplanationDto
+            {
+                OverallTasteProfile = "Unable to generate taste analysis. Please try again.",
+                WatchingPersonality = "Analysis error"
+            };
+        }
+    }
+
+    public async Task<PersonalizedPlaylistDto> GeneratePersonalizedPlaylist(List<UserMovieTasteDto> recentActivity, int count = 10)
+    {
+        if (!recentActivity.Any())
+        {
+            return new PersonalizedPlaylistDto
+            {
+                PlaylistName = "Discover Movies",
+                Description = "Start watching and rating movies to get personalized recommendations!",
+                Movies = new List<PlaylistMovieDto>()
+            };
+        }
+
+        var recentText = string.Join("\n", recentActivity.Take(20).Select(m =>
+            $"- {m.MovieName} ({m.ReleaseYear}) - {m.Genre}, Rating: {m.UserRating}/10, Watched: {m.WatchedAt:yyyy-MM-dd}"));
+
+        var randomSeed = DateTime.UtcNow.Ticks % 100000;
+
+        string prompt = $@"
+        You are a film curator creating a personalized movie playlist for a user based on their recent viewing history.
+
+        USER'S RECENT ACTIVITY (last 20 movies):
+        {recentText}
+
+        DIVERSITY SEED: {randomSeed}
+
+        YOUR TASK:
+        Create a playlist of {count} movie recommendations that match this user's taste while introducing variety.
+
+        PLAYLIST CREATION RULES:
+        1. Base recommendations on patterns in their recent viewing
+        2. Consider what they rated highly (7+ out of 10)
+        3. Introduce variety - don't just recommend the same genre
+        4. Include mix of:
+        - Similar movies to their favorites (50%)
+        - Adjacent genres they might enjoy (30%)
+        - Surprising picks based on deeper patterns (20%)
+        5. Consider release year diversity (classics + modern)
+        6. Give each movie a recommendation score (70-98)
+
+        IMPORTANT VARIETY RULES:
+        - If seed is 0-25: Focus on SIMILAR genres to their recent favorites
+        - If seed is 26-50: MIX different genres that share themes/tone
+        - If seed is 51-75: Include HIDDEN GEMS and underrated films
+        - If seed is 76-100: Add SURPRISING picks that expand their taste
+
+        MOVIE RECOMMENDATION REQUIREMENTS:
+        - Recommend REAL movies (verify they exist)
+        - NO movies from their recent activity list
+        - Vary release years (don't just recommend 2020s movies)
+        - For each movie, explain WHY based on their viewing history
+        - Recommendation scores should reflect confidence (higher for safer picks, lower for adventurous ones)
+
+        PLAYLIST NAMING:
+        - Create a catchy, personalized playlist name (e.g., ""Your Sci-Fi Thriller Journey"", ""Hidden Emotional Gems"")
+        - NOT generic names like ""Recommended for You""
+
+        JSON FORMAT (MANDATORY):
+        {{
+        ""playlistName"": ""Creative, Personalized Name"",
+        ""description"": ""2-3 sentence description of what ties this playlist together and why it matches their taste"",
+        ""reasoning"": ""1-2 sentences explaining the overall curation strategy"",
+        ""movies"": [
+            {{
+            ""movieId"": 0,
+            ""movieName"": ""Real Movie Title"",
+            ""genre"": ""Genre"",
+            ""releaseYear"": 2015,
+            ""rating"": 8.2,
+            ""posterUrl"": ""https://image.tmdb.org/t/p/w500/path.jpg"",
+            ""whyRecommended"": ""Specific explanation referencing their viewing history (e.g., 'Since you loved [Movie X] and rated [Movie Y] highly, this shares [specific element]')"",
+            ""recommendationScore"": 92
+            }}
+        ]
+        }}
+
+        CRITICAL REQUIREMENTS:
+        - Return EXACTLY {count} movies
+        - Movies array must have {count} items
+        - Each movie needs ALL fields filled
+        - movieId can be 0 (we'll match to database later)
+        - whyRecommended MUST reference specific movies from their history
+        - posterUrl should be realistic TMDB format or placeholder
+        - Output ONLY valid JSON, no markdown, no code blocks
+
+        Now create a thoughtful, diverse playlist of {count} movies!
+        ";
+
+        string raw = await GenerateText(prompt);
+
+        var settings = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<PersonalizedPlaylistDto>(raw, settings);
+
+            if (result == null || !result.Movies.Any())
+            {
+                return new PersonalizedPlaylistDto
+                {
+                    PlaylistName = "Personalized Picks",
+                    Description = "Recommendations based on your viewing history",
+                    Movies = new List<PlaylistMovieDto>()
+                };
+            }
+
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse playlist: {ex.Message}");
+            Console.WriteLine($"Raw response: {raw}");
+            LogAiError("Playlist Generation", raw);
+            
+            return new PersonalizedPlaylistDto
+            {
+                PlaylistName = "Discover More",
+                Description = "Unable to generate playlist at this time",
+                Movies = new List<PlaylistMovieDto>()
+            };
+        }
+    }
+    private void LogAiError(string context, string response)
+    {
+        Console.WriteLine($"[AI ERROR] {context}");
+        Console.WriteLine($"[AI RESPONSE] {response.Substring(0, Math.Min(500, response.Length))}...");
+    }
 }
+
 
 public class GeminiResponse
 {
@@ -426,3 +670,4 @@ public class Part
 {
     public string text { get; set; }
 }
+
