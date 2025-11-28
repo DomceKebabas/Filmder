@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Filmder.Models;
+using Filmder.MovieParty;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -25,11 +26,27 @@ public class AppDbContext(DbContextOptions options) : IdentityDbContext<AppUser>
     public DbSet<PersonalityMatchResult> PersonalityMatchResults { get; set; }
     public DbSet<HigherLowerGame> HigherLowerGames { get; set; }
     public DbSet<HigherLowerGuess> HigherLowerGuesses { get; set; }
-
+    public DbSet<WatchParty> WatchParties { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        
+        modelBuilder.Entity<WatchParty>(entity =>
+        {
+            entity.HasKey(wp => wp.Id);
+    
+            entity.HasOne(wp => wp.Group)
+                .WithMany()
+                .HasForeignKey(wp => wp.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+    
+            entity.HasOne(wp => wp.Host)
+                .WithMany()
+                .HasForeignKey(wp => wp.HostUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
     
         modelBuilder
             .Entity<Movie>()
