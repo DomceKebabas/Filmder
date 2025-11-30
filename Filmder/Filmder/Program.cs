@@ -118,10 +118,14 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173") 
+            .WithOrigins("http://localhost:5173")
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials();
+            .AllowCredentials()
+            .SetIsOriginAllowed(origin => 
+                origin.StartsWith("chrome-extension://") || 
+                origin == "http://localhost:5173"
+            );
     });
 });
 
@@ -146,7 +150,7 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.MapHub<WatchPartyHub>("/watchPartyHub");
 app.MapHub<ChatHub>("/chatHub");
 app.MapControllers();
 
