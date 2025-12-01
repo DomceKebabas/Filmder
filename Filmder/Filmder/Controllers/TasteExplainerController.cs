@@ -3,10 +3,11 @@ using Filmder.Data;
 using Filmder.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Filmder.Controllers;
-
+[EnableRateLimiting("ExpensiveDaily")]
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]

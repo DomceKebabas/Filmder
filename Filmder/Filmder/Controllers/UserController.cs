@@ -4,12 +4,14 @@ using Filmder.DTOs;
 using Filmder.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Filmder.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("DefaultBucket")]
 public class UserController : ControllerBase
 {
     private readonly UserManager<AppUser> _userManager;

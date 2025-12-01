@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using System.Threading.RateLimiting;
 using Filmder.Data;
 using Filmder.Interfaces;
 using Filmder.Middleware;
@@ -7,6 +9,7 @@ using Filmder.Services;
 using Filmder.Signal;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -68,92 +71,122 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("ExpensiveDaily", opt =>
+    {
+        opt.PermitLimit = 200;
+        opt.Window = TimeSpan.FromHours(24);
+    });
+
+    options.AddTokenBucketLimiter("DefaultBucket", opt =>
+    {
+        opt.TokenLimit = 50;
+        opt.ReplenishmentPeriod = TimeSpan.FromSeconds(1);
+        opt.TokensPerPeriod = 10;
+        opt.AutoReplenishment = true;
+    });
+
+    options.AddSlidingWindowLimiter("SlidingLimiter", opt =>
+    {
+        opt.PermitLimit = 20;
+        opt.Window = TimeSpan.FromSeconds(30);
+        opt.SegmentsPerWindow = 3;
+        opt.QueueLimit = 5;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
+
+
+
+
+
+
 builder.Services.AddSingleton<IAIService, GeminiAiService>();
-builder.Services.AddSingleton<TmdbApiService>();
+    builder.Services.AddSingleton<TmdbApiService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<MovieImportService>();
-builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
+    builder.Services.AddScoped<ITokenService, TokenService>();
+    builder.Services.AddScoped<MovieImportService>();
+    builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
 
-builder.Services.AddSignalR();
+    builder.Services.AddSignalR();
 
-builder.Services.AddIdentityCore<AppUser>(opt =>
-{
-    opt.Password.RequireDigit = false;
-    opt.User.RequireUniqueEmail = true;
-})
-.AddRoles<IdentityRole>()
-.AddRoleManager<RoleManager<IdentityRole>>()
-.AddEntityFrameworkStores<AppDbContext>()
-.AddSignInManager<SignInManager<AppUser>>()
-.AddDefaultTokenProviders();
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-    var tokenKey = builder.Configuration["TokenKey"] ?? throw new Exception("token key not found - program.cs");
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(tokenKey)),
-        ValidateIssuer = false,
-        ValidateAudience = false,
-    };
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
+    builder.Services.AddIdentityCore<AppUser>(opt =>
         {
-            var accessToken = context.Request.Query["access_token"];
-            var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+            opt.Password.RequireDigit = false;
+            opt.User.RequireUniqueEmail = true;
+        })
+        .AddRoles<IdentityRole>()
+        .AddRoleManager<RoleManager<IdentityRole>>()
+        .AddEntityFrameworkStores<AppDbContext>()
+        .AddSignInManager<SignInManager<AppUser>>()
+        .AddDefaultTokenProviders();
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+    {
+        var tokenKey = builder.Configuration["TokenKey"] ?? throw new Exception("token key not found - program.cs");
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(tokenKey)),
+            ValidateIssuer = false,
+            ValidateAudience = false,
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
             {
-                context.Token = accessToken;
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
             }
-            return Task.CompletedTask;
-        }
-    };
-});
-
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()
-            .SetIsOriginAllowed(origin => 
-                origin.StartsWith("chrome-extension://") || 
-                origin == "http://localhost:5173"
-            );
+        };
     });
-});
 
-var app = builder.Build();
-
-
-app.UseMiddleware<ExceptionMiddleware>();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    builder.Services.AddCors(options =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Filmder API V1");
+        options.AddPolicy("AllowFrontend", policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:5173")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials()
+                .SetIsOriginAllowed(origin =>
+                    origin.StartsWith("chrome-extension://") ||
+                    origin == "http://localhost:5173"
+                );
+        });
     });
-}
+
+    var app = builder.Build();
+
+    app.UseRateLimiter();
+    app.UseMiddleware<ExceptionMiddleware>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "Filmder API V1"); });
+    }
 
 
-app.UseHttpsRedirection();
+    app.UseHttpsRedirection();
 
-app.UseCors("AllowFrontend");
+    app.UseCors("AllowFrontend");
 
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapHub<WatchPartyHub>("/watchPartyHub");
-app.MapHub<ChatHub>("/chatHub");
-app.MapControllers();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapHub<WatchPartyHub>("/watchPartyHub");
+    app.MapHub<ChatHub>("/chatHub");
+    app.MapControllers();
 
-app.Run();
+    app.Run();

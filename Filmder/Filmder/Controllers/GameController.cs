@@ -5,11 +5,13 @@ using Filmder.Models;
 using Filmder.Extensions;
 using Filmder.Signal;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Filmder.Controllers;
 [ApiController]
+[EnableRateLimiting("DefaultBucket")]
 public class GameController : ControllerBase
 {
     private readonly AppDbContext _dbContext;

@@ -3,10 +3,11 @@ using Filmder.DTOs;
 using Filmder.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Filmder.Controllers;
-
+[EnableRateLimiting("DefaultBucket")]
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]

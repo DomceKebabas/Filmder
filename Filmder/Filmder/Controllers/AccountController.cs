@@ -12,6 +12,7 @@ namespace Filmder.Controllers;
 [ApiController]
 public class AccountController(UserManager<AppUser> userManager, SignInManager<AppUser>signInManager,ITokenService tokenService,IEmailSender _emailSender) : ControllerBase
 {
+    [EnableRateLimiting("ExpensiveDaily")]
     [HttpPost]
     [Route("register")]
     public async Task<ActionResult<UserDto>> Register(RegisterDto registerDto)
