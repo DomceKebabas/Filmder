@@ -4,12 +4,13 @@ using Filmder.Models;
 using Filmder.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Filmder.Controllers;
-
 [ApiController]
 public class AccountController(UserManager<AppUser> userManager, SignInManager<AppUser>signInManager,ITokenService tokenService) : ControllerBase
 {
+    [EnableRateLimiting("ExpensiveDaily")]
     [HttpPost]
     [Route("register")]
     public async Task<ActionResult<UserDto>> Register(RegisterDto registerDto)
@@ -35,7 +36,8 @@ public class AccountController(UserManager<AppUser> userManager, SignInManager<A
 
         return Ok(new UserDto(user.Id, user.Email, tokenService.CreateToken(user)));
     }
-
+    
+    [EnableRateLimiting("SlidingLimiter")]
     [HttpPost]
     [Route("login")]
     public async Task<ActionResult<UserDto>> Login(LoginDto loginDto)

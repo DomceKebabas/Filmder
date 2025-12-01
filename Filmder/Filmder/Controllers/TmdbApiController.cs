@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
+[EnableRateLimiting("ExpensiveDaily")]
 [ApiController]
 [Route("api/[controller]")]
 public class TmdbApiController : ControllerBase
