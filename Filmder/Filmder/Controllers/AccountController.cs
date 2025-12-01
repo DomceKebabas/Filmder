@@ -14,21 +14,26 @@ public class AccountController(UserManager<AppUser> userManager, SignInManager<A
     [Route("register")]
     public async Task<ActionResult<UserDto>> Register(RegisterDto registerDto)
     {
+        var existingUser = await userManager.FindByNameAsync(registerDto.Username);
+        if (existingUser != null)
+        {
+            return BadRequest(new { message = "Username is already taken" });
+        }
+
         var user = new AppUser
         {
             Email = registerDto.Email,
-            UserName = registerDto.Email
+            UserName = registerDto.Username
         };
-       var result = await userManager.CreateAsync(user, registerDto.Password);
-       
-       if (!result.Succeeded)
-       {
-           return BadRequest(result.Errors);
-       }
+    
+        var result = await userManager.CreateAsync(user, registerDto.Password);
+   
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
 
-       return Ok(new UserDto(user.Id, user.Email!, tokenService.CreateToken(user)));
-
-
+        return Ok(new UserDto(user.Id, user.Email, tokenService.CreateToken(user)));
     }
 
     [HttpPost]

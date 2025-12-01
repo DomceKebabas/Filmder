@@ -189,6 +189,4 @@ public class GroupController(AppDbContext context) : ControllerBase
 
         return Ok(sharedMovies);
     }
-    
-    
 }
