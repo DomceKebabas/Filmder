@@ -5,9 +5,10 @@ using Filmder.Models;
 using Filmder.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Filmder.Controllers;
-
+[EnableRateLimiting("SlidingLimiter")]
 [ApiController]
 public class AccountController(UserManager<AppUser> userManager, SignInManager<AppUser>signInManager,ITokenService tokenService,IEmailSender _emailSender) : ControllerBase
 {
