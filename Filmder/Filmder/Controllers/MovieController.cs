@@ -6,9 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Filmder.Extensions;
 using Filmder.Services;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Filmder.Controllers;
-
+[EnableRateLimiting("DefaultBucket")]
 [ApiController]
 [Route("api/[controller]")]
 public class MovieController : ControllerBase
