@@ -190,4 +190,128 @@ public class GroupController(AppDbContext context) : ControllerBase
 
         return Ok(sharedMovies);
     }
+    
+    [HttpPost("{groupId}/add-member")]
+    public async Task<IActionResult> AddMember(int groupId, [FromBody] string email)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        var group = await context.Groups
+            .Include(g => g.GroupMembers)
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null) return NotFound();
+
+        var isMember = group.GroupMembers.Any(m => m.UserId == userId);
+        if (!isMember) return Forbid(); 
+
+        var userToAdd = await context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (userToAdd == null) return NotFound("User not found");
+
+        var alreadyInGroup = group.GroupMembers.Any(m => m.UserId == userToAdd.Id);
+        if (alreadyInGroup) return BadRequest("User already in group");
+
+        context.GroupMembers.Add(new GroupMember
+        {
+            GroupId = groupId,
+            UserId = userToAdd.Id,
+            JoinedAt = DateTime.UtcNow
+        });
+
+        await context.SaveChangesAsync();
+        return Ok("User added");
+    }
+    [HttpDelete("{groupId}/kick/{userId}")]
+    public async Task<IActionResult> KickMember(int groupId, string userId)
+    {
+        var requesterId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        var group = await context.Groups
+            .Include(g => g.GroupMembers)
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null) return NotFound();
+        if (group.OwnerId != requesterId) return Forbid();
+
+        var member = group.GroupMembers.FirstOrDefault(m => m.UserId == userId);
+        if (member == null) return NotFound("User is not in group");
+
+        if (userId == group.OwnerId) return BadRequest("Owner cannot be removed");
+
+        context.GroupMembers.Remove(member);
+        await context.SaveChangesAsync();
+
+        return Ok("User removed");
+    }
+
+    
+    [HttpDelete("{groupId}")]
+    public async Task<IActionResult> DeleteGroup(int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        var group = await context.Groups
+            .Include(g => g.GroupMembers)
+            .Include(g => g.Messages)
+            .Include(g => g.GroupMovie)
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null) return NotFound();
+        if (group.OwnerId != userId) return Forbid();
+
+        context.GroupMembers.RemoveRange(group.GroupMembers);
+        context.SharedMovies.RemoveRange(group.GroupMovie);
+        context.Messages.RemoveRange(group.Messages);
+        context.Groups.Remove(group);
+
+        await context.SaveChangesAsync();
+
+        return Ok("Group deleted");
+    }
+
+    
+    [HttpDelete("{groupId}/leave")]
+    public async Task<IActionResult> LeaveGroup(int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+        var group = await context.Groups
+            .Include(g => g.GroupMembers)
+            .FirstOrDefaultAsync(g => g.Id == groupId);
+
+        if (group == null) return NotFound();
+
+        var member = group.GroupMembers.FirstOrDefault(m => m.UserId == userId);
+        if (member == null) return BadRequest("Not in group");
+
+        bool isOwner = group.OwnerId == userId;
+
+        if (isOwner)
+        {
+            var otherMembers = group.GroupMembers
+                .Where(m => m.UserId != userId)
+                .ToList();
+
+            if (!otherMembers.Any())
+            {
+                context.GroupMembers.Remove(member);
+                context.Groups.Remove(group);
+                await context.SaveChangesAsync();
+
+                return Ok("Group deleted because owner left and no members remained.");
+            }
+
+            var randomGenerator = new Random();
+            var randomIndex = randomGenerator.Next(otherMembers.Count);
+            var newOwner = otherMembers[randomIndex];
+
+            group.OwnerId = newOwner.UserId;
+        }
+
+        context.GroupMembers.Remove(member);
+        await context.SaveChangesAsync();
+
+        return Ok("Left group.");
+    }
+
 }
