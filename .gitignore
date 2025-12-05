@@ -1,5 +1,7 @@
 ﻿log.txt
 
+wwwroot/uploads/
+
 # Build results
 bin/
 obj/
