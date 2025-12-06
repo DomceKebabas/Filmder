@@ -17,6 +17,8 @@ public class Group
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
+    public string? GroupPictureUrl { get; set; }
+    
     // Navigation
     public ICollection<AppUser> Members { get; set; } = new List<AppUser>();
     public ICollection<GroupMember> GroupMembers { get; set; } = new List<GroupMember>();

@@ -171,6 +171,7 @@ builder.Services.AddTransient<IEmailSender, EmailSender>();
 
     app.UseRateLimiter();
     app.UseMiddleware<ExceptionMiddleware>();
+    app.UseStaticFiles();
 
     if (app.Environment.IsDevelopment())
     {
