@@ -30,24 +30,49 @@ public class TasteExplainerController : ControllerBase
 
         try
         {
-            // Get user's watched movies with ratings
-            var watchedMovies = await _context.UserMovies
+            var userRatings = await _context.Ratings
+                .Where(r => r.UserId == userId)
+                .Include(r => r.Movie)
+                .ToDictionaryAsync(r => r.MovieId);
+
+            // Get user's watched movies
+            var userMovies = await _context.UserMovies
                 .Where(um => um.UserId == userId)
                 .Include(um => um.Movie)
-                .Include(um => um.Rating)
                 .OrderByDescending(um => um.WatchedAt)
-                .Take(50) // Analyze last 50 movies for better insights
+                .Take(50)
+                .ToListAsync();
+
+            // Build watched movies list, joining ratings from the Ratings table
+            var watchedMovies = userMovies
                 .Select(um => new UserMovieTasteDto
                 {
                     MovieName = um.Movie.Name,
                     Genre = um.Movie.Genre.ToString(),
                     ReleaseYear = um.Movie.ReleaseYear,
                     Director = um.Movie.Director,
-                    UserRating = um.Rating != null ? um.Rating.Score : null,
-                    UserComment = um.Rating != null ? um.Rating.Comment : null,
+                    UserRating = userRatings.TryGetValue(um.MovieId, out var rating) ? rating.Score : null,
+                    UserComment = userRatings.GetValueOrDefault(um.MovieId)?.Comment,
                     WatchedAt = um.WatchedAt
                 })
-                .ToListAsync();
+                .ToList();
+            
+            var userMovieIds = userMovies.Select(um => um.MovieId).ToHashSet();
+            var ratingsWithoutUserMovie = userRatings
+                .Where(kvp => !userMovieIds.Contains(kvp.Key))
+                .Select(kvp => new UserMovieTasteDto
+                {
+                    MovieName = kvp.Value.Movie.Name,
+                    Genre = kvp.Value.Movie.Genre.ToString(),
+                    ReleaseYear = kvp.Value.Movie.ReleaseYear,
+                    Director = kvp.Value.Movie.Director,
+                    UserRating = kvp.Value.Score,
+                    UserComment = kvp.Value.Comment,
+                    WatchedAt = kvp.Value.CreatedAt
+                })
+                .ToList();
+
+            watchedMovies.AddRange(ratingsWithoutUserMovie);
 
             if (!watchedMovies.Any())
             {
@@ -91,32 +116,43 @@ public class TasteExplainerController : ControllerBase
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) return Unauthorized();
-
-        var stats = await _context.UserMovies
-            .Where(um => um.UserId == userId)
-            .Include(um => um.Movie)
-            .Include(um => um.Rating)
+        
+        var userRatings = await _context.Ratings
+            .Where(r => r.UserId == userId)
+            .Include(r => r.Movie)
             .ToListAsync();
 
-        var ratedMovies = stats.Where(um => um.Rating != null).ToList();
+        var userMovies = await _context.UserMovies
+            .Where(um => um.UserId == userId)
+            .Include(um => um.Movie)
+            .ToListAsync();
+        
+        var ratingsByMovieId = userRatings.ToDictionary(r => r.MovieId);
 
         var summary = new
         {
-            totalWatched = stats.Count,
-            totalRated = ratedMovies.Count,
-            averageRating = ratedMovies.Any() ? Math.Round(ratedMovies.Average(um => um.Rating!.Score), 1) : 0,
-            favoriteGenre = stats
-                .GroupBy(um => um.Movie.Genre)
-                .OrderByDescending(g => g.Count())
-                .FirstOrDefault()?.Key.ToString() ?? "None yet",
-            recentlyWatched = stats
+            totalWatched = userMovies.Count,
+            totalRated = userRatings.Count,
+            averageRating = userRatings.Any() ? Math.Round(userRatings.Average(r => r.Score), 1) : 0,
+            favoriteGenre = userRatings.Any() 
+                ? userRatings
+                    .GroupBy(r => r.Movie.Genre)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key.ToString() ?? "None yet"
+                : userMovies.Any()
+                    ? userMovies
+                        .GroupBy(um => um.Movie.Genre)
+                        .OrderByDescending(g => g.Count())
+                        .FirstOrDefault()?.Key.ToString() ?? "None yet"
+                    : "None yet",
+            recentlyWatched = userMovies
                 .OrderByDescending(um => um.WatchedAt)
                 .Take(5)
                 .Select(um => new
                 {
                     um.Movie.Name,
                     um.Movie.Genre,
-                    Rating = um.Rating?.Score,
+                    Rating = ratingsByMovieId.TryGetValue(um.MovieId, out var r) ? r.Score : (int?)null,
                     um.WatchedAt
                 })
                 .ToList()

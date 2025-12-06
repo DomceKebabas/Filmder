@@ -35,48 +35,79 @@ public class PersonalizedPlaylistController : ControllerBase
 
         try
         {
-            // Get recent user activity (last 30 days or last 20 movies)
+            // Get all user ratings (ratings exist independently of UserMovies)
+            var userRatings = await _context.Ratings
+                .Where(r => r.UserId == userId)
+                .ToDictionaryAsync(r => r.MovieId);
+
             var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
             
-            var recentActivity = await _context.UserMovies
+            // Get recent user activity
+            var recentUserMovies = await _context.UserMovies
                 .Where(um => um.UserId == userId && um.WatchedAt >= thirtyDaysAgo)
                 .Include(um => um.Movie)
-                .Include(um => um.Rating)
                 .OrderByDescending(um => um.WatchedAt)
                 .Take(20)
-                .Select(um => new UserMovieTasteDto
-                {
-                    MovieName = um.Movie.Name,
-                    Genre = um.Movie.Genre.ToString(),
-                    ReleaseYear = um.Movie.ReleaseYear,
-                    Director = um.Movie.Director,
-                    UserRating = um.Rating != null ? um.Rating.Score : null,
-                    UserComment = um.Rating != null ? um.Rating.Comment : null,
-                    WatchedAt = um.WatchedAt
-                })
                 .ToListAsync();
 
-            // If not enough recent activity, get their highest-rated movies
+            var recentActivity = recentUserMovies.Select(um => new UserMovieTasteDto
+            {
+                MovieName = um.Movie.Name,
+                Genre = um.Movie.Genre.ToString(),
+                ReleaseYear = um.Movie.ReleaseYear,
+                Director = um.Movie.Director,
+                UserRating = userRatings.TryGetValue(um.MovieId, out var rating) ? rating.Score : null,
+                UserComment = userRatings.GetValueOrDefault(um.MovieId)?.Comment,
+                WatchedAt = um.WatchedAt
+            }).ToList();
+
+            // If not enough recent activity, get all UserMovies with their ratings
             if (recentActivity.Count < 5)
             {
-                recentActivity = await _context.UserMovies
-                    .Where(um => um.UserId == userId && um.Rating != null)
+                var userMoviesWithRatings = await _context.UserMovies
+                    .Where(um => um.UserId == userId)
                     .Include(um => um.Movie)
-                    .Include(um => um.Rating)
-                    .OrderByDescending(um => um.Rating!.Score)
-                    .ThenByDescending(um => um.WatchedAt)
+                    .OrderByDescending(um => um.WatchedAt)
                     .Take(20)
+                    .ToListAsync();
+
+                recentActivity = userMoviesWithRatings
                     .Select(um => new UserMovieTasteDto
                     {
                         MovieName = um.Movie.Name,
                         Genre = um.Movie.Genre.ToString(),
                         ReleaseYear = um.Movie.ReleaseYear,
                         Director = um.Movie.Director,
-                        UserRating = um.Rating!.Score,
-                        UserComment = um.Rating.Comment,
+                        UserRating = userRatings.TryGetValue(um.MovieId, out var rating) ? rating.Score : null,
+                        UserComment = userRatings.GetValueOrDefault(um.MovieId)?.Comment,
                         WatchedAt = um.WatchedAt
                     })
+                    .OrderByDescending(m => m.UserRating ?? 0)
+                    .ThenByDescending(m => m.WatchedAt)
+                    .ToList();
+            }
+            
+            if (!recentActivity.Any() && userRatings.Any())
+            {
+                var ratedMovieIds = userRatings.Keys.ToList();
+                var ratedMovies = await _context.Movies
+                    .Where(m => ratedMovieIds.Contains(m.Id))
                     .ToListAsync();
+
+                recentActivity = ratedMovies
+                    .Select(m => new UserMovieTasteDto
+                    {
+                        MovieName = m.Name,
+                        Genre = m.Genre.ToString(),
+                        ReleaseYear = m.ReleaseYear,
+                        Director = m.Director,
+                        UserRating = userRatings[m.Id].Score,
+                        UserComment = userRatings[m.Id].Comment,
+                        WatchedAt = userRatings[m.Id].CreatedAt
+                    })
+                    .OrderByDescending(m => m.UserRating)
+                    .Take(20)
+                    .ToList();
             }
 
             if (!recentActivity.Any())
@@ -95,7 +126,6 @@ public class PersonalizedPlaylistController : ControllerBase
 
             foreach (var playlistMovie in playlist.Movies)
             {
-                // Try to find movie in database by name and year
                 var dbMovie = await _context.Movies
                     .Where(m => !watchedMovieIds.Contains(m.Id))
                     .Where(m => m.Name.Contains(playlistMovie.MovieName) || 
@@ -130,10 +160,14 @@ public class PersonalizedPlaylistController : ControllerBase
 
         try
         {
-            var favoriteGenres = await _context.UserMovies
-                .Where(um => um.UserId == userId && um.Rating != null && um.Rating.Score >= 7)
-                .Include(um => um.Movie)
-                .GroupBy(um => um.Movie.Genre)
+            var highRatedMovieIds = await _context.Ratings
+                .Where(r => r.UserId == userId && r.Score >= 7)
+                .Select(r => r.MovieId)
+                .ToListAsync();
+
+            var favoriteGenres = await _context.Movies
+                .Where(m => highRatedMovieIds.Contains(m.Id))
+                .GroupBy(m => m.Genre)
                 .OrderByDescending(g => g.Count())
                 .Take(3)
                 .Select(g => g.Key)
@@ -149,14 +183,12 @@ public class PersonalizedPlaylistController : ControllerBase
                 .Select(um => um.MovieId)
                 .ToHashSetAsync();
 
-            // FIX: Get movies first, then randomize in memory
             var quickPicks = await _context.Movies
                 .Where(m => !watchedIds.Contains(m.Id))
                 .Where(m => favoriteGenres.Contains(m.Genre))
                 .Where(m => m.Rating >= 7.5)
-                .ToListAsync();  // Load to memory first
+                .ToListAsync();
 
-            // Now randomize in memory
             var randomPicks = quickPicks
                 .OrderBy(m => Guid.NewGuid())
                 .Take(5)
