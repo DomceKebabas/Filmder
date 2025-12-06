@@ -16,7 +16,7 @@ public class ChatHub : Hub
     public async Task SendMessageToGroup(int groupId, string message)
     {
         var userName = Context.User.FindFirstValue(ClaimTypes.Name) ?? "Unknown";
-        await Clients.Group(groupId.ToString())
+        await Clients.GroupExcept(groupId.ToString(), Context.ConnectionId)
             .SendAsync("getMessage", userName, message);
     }
     public async Task gameCreated(string groupId, string creatorName)
