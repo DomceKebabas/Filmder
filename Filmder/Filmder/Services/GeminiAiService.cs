@@ -634,7 +634,7 @@ public class GeminiAiService : IAIService
             Console.WriteLine($"Failed to parse playlist: {ex.Message}");
             Console.WriteLine($"Raw response: {raw}");
             LogAiError("Playlist Generation", raw);
-            
+
             return new PersonalizedPlaylistDto
             {
                 PlaylistName = "Discover More",
@@ -648,26 +648,144 @@ public class GeminiAiService : IAIService
         Console.WriteLine($"[AI ERROR] {context}");
         Console.WriteLine($"[AI RESPONSE] {response.Substring(0, Math.Min(500, response.Length))}...");
     }
+    
+    public async Task<MovieTriviaDto> GenerateMovieTrivia(string movieName, int releaseYear, string genre, string director, string description, int questionCount = 10)
+    {
+        var randomSeed = DateTime.UtcNow.Ticks % 100000;
+        
+        string prompt = $@"
+        You are creating a movie trivia quiz for '{movieName}' ({releaseYear}).
+
+        MOVIE INFORMATION:
+        - Title: {movieName}
+        - Year: {releaseYear}
+        - Genre: {genre}
+        - Director: {director}
+        - Description: {description}
+
+        RANDOMIZATION SEED: {randomSeed}
+
+        YOUR TASK:
+        Generate {questionCount} multiple-choice trivia questions about this specific movie.
+
+        QUESTION REQUIREMENTS:
+        1. Questions must be SPECIFIC to this movie (not generic film questions)
+        2. Mix of difficulty levels:
+        - 30% Easy (obvious from watching once)
+        - 50% Medium (requires attention to detail)
+        - 20% Hard (for true fans)
+        3. Question categories to include:
+        - Plot details and key events
+        - Character names and relationships
+        - Memorable quotes (if applicable)
+        - Production facts (if relevant to movie knowledge)
+        - Themes and symbolism
+        - Specific scenes or sequences
+        4. Each question must have EXACTLY 4 options
+        5. Only ONE option is correct
+        6. Wrong options should be plausible but clearly incorrect
+        7. Avoid questions that require external knowledge (like box office numbers)
+
+        IMPORTANT RULES:
+        - Questions should test MOVIE KNOWLEDGE, not trivia about actors' personal lives
+        - Avoid yes/no questions - always provide 4 distinct options
+        - Make wrong answers believable (not obviously fake)
+        - Randomize correct answer position (don't always make it option A)
+
+        EXAMPLE GOOD QUESTIONS:
+        - ""What was the name of the city where the heist took place?""
+        - ""Which character said the line '[memorable quote]'?""
+        - ""What object did [character] use to [plot event]?""
+        - ""In which year was the movie set?""
+
+        EXAMPLE BAD QUESTIONS:
+        - ""Is this a good movie?"" (opinion)
+        - ""How much did the movie gross?"" (external trivia)
+        - ""What other movies has the director made?"" (not about THIS movie)
+
+        JSON FORMAT (MANDATORY):
+        {{
+        ""movieId"": 0,
+        ""movieName"": ""{movieName}"",
+        ""questions"": [
+            {{
+            ""question"": ""Specific question about the movie?"",
+            ""options"": [
+                ""Option A"",
+                ""Option B"",
+                ""Option C"",
+                ""Option D""
+            ],
+            ""correctAnswerIndex"": 2
+            }}
+        ]
+        }}
+
+        OUTPUT RULES:
+        - Output ONLY valid JSON
+        - No markdown, no code blocks, no extra text
+        - Generate EXACTLY {questionCount} questions
+        - correctAnswerIndex must be 0, 1, 2, or 3
+        - Vary the correctAnswerIndex across questions (don't always use 0)
+
+        Now generate {questionCount} high-quality trivia questions for '{movieName}'!
+        ";
+
+        string raw = await GenerateText(prompt);
+
+        var settings = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<MovieTriviaDto>(raw, settings);
+            
+            if (result == null || !result.Questions.Any())
+            {
+                return new MovieTriviaDto
+                {
+                    MovieName = movieName,
+                    Questions = new List<TriviaQuestionDto>()
+                };
+            }
+
+            result.MovieName = movieName;
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse trivia: {ex.Message}");
+            Console.WriteLine($"Raw response: {raw}");
+            
+            return new MovieTriviaDto
+            {
+                MovieName = movieName,
+                Questions = new List<TriviaQuestionDto>()
+            };
+        }
+    }
 }
 
 
 public class GeminiResponse
 {
-    public Candidate[] candidates { get; set; }
+    public required Candidate[] candidates { get; set; }
 }
 
 public class Candidate
 {
-    public Content content { get; set; }
+    public required Content content { get; set; }
 }
 
 public class Content
 {
-    public Part[] parts { get; set; }
+    public required Part[] parts { get; set; }
 }
 
 public class Part
 {
-    public string text { get; set; }
+    public required string text { get; set; }
 }
 
