@@ -20,6 +20,28 @@ public class GuessRatingGameController : ControllerBase
     {
         _dbContext = dbContext;
     }
+    
+    private async Task CheckIfGameShouldFinish(GuessRatingGame game)  
+    {
+        if (DateTime.UtcNow >= game.ExpiresAt)
+        {
+            game.IsActive = false;
+            await _dbContext.SaveChangesAsync();
+            return;
+        }
+
+        int memberCount = game.Group.GroupMembers.Count;
+
+        int playersFinished = game.Guesses
+            .GroupBy(g => g.UserId)
+            .Count(g => g.Count() == game.TotalMovies);
+
+        if (playersFinished == memberCount) 
+        {
+            game.IsActive = false;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
 
     [HttpPost("groups/{groupId}/guessing-games")]
     public async Task<ActionResult<object>> CreateGame(int groupId)
@@ -56,7 +78,9 @@ public class GuessRatingGameController : ControllerBase
                 GroupId = groupId,
                 UserId = userId,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddHours(24),    
+                TotalMovies = movies.Count                   
             };
 
             _dbContext.RatingGuessingGames.Add(guessRatingGame);
@@ -171,6 +195,14 @@ public class GuessRatingGameController : ControllerBase
             
             _dbContext.MovieRatingGuesses.Add(guess);
             await _dbContext.SaveChangesAsync();
+            
+            game = await _dbContext.RatingGuessingGames
+                .Include(g => g.Group)
+                .ThenInclude(g => g.GroupMembers)
+                .Include(g => g.Guesses)
+                .FirstOrDefaultAsync(g => g.Id == gameId);
+
+            await CheckIfGameShouldFinish(game);
             
             return Ok(new 
             { 

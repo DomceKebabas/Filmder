@@ -17,6 +17,9 @@ public class GuessRatingGame
     public bool IsActive { get; set; } = true;
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public int TotalMovies { get; set; }     
+    public DateTime ExpiresAt { get; set; }
 
     public ICollection<Movie> Movies { get; set; } = new List<Movie>();
     
