@@ -4,5 +4,5 @@ public class CreateGroupDto
 {
     public string Name { get; set; } = string.Empty;
     
-    public List<string> FriendEmails { get; set; } = new List<string>();
+    public List<string> FriendEmails { get; set; } = new();
 }
