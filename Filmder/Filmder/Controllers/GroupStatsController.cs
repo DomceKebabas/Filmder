@@ -31,11 +31,146 @@ public class GroupStatsController : ControllerBase
         
         if (groupMember == null) return Unauthorized();
 
-        var groupGamesCount = await _dbContext.Games
+        // Count voting games
+        var votingGamesCount = await _dbContext.Games
             .Where(gm => gm.GroupId == groupId && !gm.IsActive)
             .CountAsync();
 
-        return Ok(groupGamesCount);
+        // Count rating guessing games
+        var ratingGamesCount = await _dbContext.RatingGuessingGames
+            .Where(rg => rg.GroupId == groupId && !rg.IsActive)
+            .CountAsync();
+
+        return Ok(votingGamesCount + ratingGamesCount);
+    }
+    
+    [HttpGet("ratingGamesCount")]
+    public async Task<ActionResult<int>> RatingGamesPlayed([FromQuery] int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return BadRequest();
+
+        var groupMember = await _dbContext.GroupMembers
+            .FirstOrDefaultAsync(gm => gm.UserId == userId && gm.GroupId == groupId);
+        
+        if (groupMember == null) return Unauthorized();
+
+        var ratingGamesCount = await _dbContext.RatingGuessingGames
+            .Where(rg => rg.GroupId == groupId && !rg.IsActive)
+            .CountAsync();
+
+        return Ok(ratingGamesCount);
+    }
+    
+    [HttpGet("votingGamesCount")]
+    public async Task<ActionResult<int>> VotingGamesPlayed([FromQuery] int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return BadRequest();
+
+        var groupMember = await _dbContext.GroupMembers
+            .FirstOrDefaultAsync(gm => gm.UserId == userId && gm.GroupId == groupId);
+        
+        if (groupMember == null) return Unauthorized();
+
+        var votingGamesCount = await _dbContext.Games
+            .Where(gm => gm.GroupId == groupId && !gm.IsActive)
+            .CountAsync();
+
+        return Ok(votingGamesCount);
+    }
+    
+    [HttpGet("bestRatingGuesser")]
+    public async Task<ActionResult> GetBestRatingGuesser([FromQuery] int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return BadRequest();
+
+        var groupMember = await _dbContext.GroupMembers
+            .FirstOrDefaultAsync(gm => gm.UserId == userId && gm.GroupId == groupId);
+        
+        if (groupMember == null) return Unauthorized();
+
+        // Get all finished rating games for this group
+        var finishedGames = await _dbContext.RatingGuessingGames
+            .Where(rg => rg.GroupId == groupId && !rg.IsActive)
+            .Include(rg => rg.Movies)
+            .Include(rg => rg.Guesses)
+                .ThenInclude(g => g.User)
+            .ToListAsync();
+
+        if (!finishedGames.Any())
+            return NotFound("No finished rating games");
+
+        // Calculate average difference for each player across all games
+        var playerStats = finishedGames
+            .SelectMany(game => game.Guesses.Select(guess => new
+            {
+                guess.UserId,
+                guess.User,
+                Difference = Math.Abs(
+                    game.Movies.FirstOrDefault(m => m.Id == guess.MovieId)?.Rating ?? 0 
+                    - guess.RatingGuessValue
+                )
+            }))
+            .GroupBy(x => x.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                Username = group.FirstOrDefault()?.User?.UserName 
+                    ?? group.FirstOrDefault()?.User?.Email 
+                    ?? "Unknown",
+                AverageDifference = Math.Round(group.Average(x => x.Difference), 2),
+                TotalGuesses = group.Count()
+            })
+            .OrderBy(x => x.AverageDifference)
+            .FirstOrDefault();
+
+        if (playerStats == null)
+            return NotFound("No guesses found");
+
+        return Ok(new
+        {
+            userId = playerStats.UserId,
+            username = playerStats.Username,
+            averageDifference = playerStats.AverageDifference,
+            totalGuesses = playerStats.TotalGuesses
+        });
+    }
+    
+    [HttpGet("averageGuessDifference")]
+    public async Task<ActionResult<double>> GetAverageGuessDifference([FromQuery] int groupId)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return BadRequest();
+
+        var groupMember = await _dbContext.GroupMembers
+            .FirstOrDefaultAsync(gm => gm.UserId == userId && gm.GroupId == groupId);
+        
+        if (groupMember == null) return Unauthorized();
+
+        var finishedGames = await _dbContext.RatingGuessingGames
+            .Where(rg => rg.GroupId == groupId && !rg.IsActive)
+            .Include(rg => rg.Movies)
+            .Include(rg => rg.Guesses)
+            .ToListAsync();
+
+        if (!finishedGames.Any())
+            return Ok(0.0);
+
+        var allDifferences = finishedGames
+            .SelectMany(game => game.Guesses.Select(guess => 
+                Math.Abs(
+                    game.Movies.FirstOrDefault(m => m.Id == guess.MovieId)?.Rating ?? 0 
+                    - guess.RatingGuessValue
+                )
+            ))
+            .ToList();
+
+        if (!allDifferences.Any())
+            return Ok(0.0);
+
+        return Ok(Math.Round(allDifferences.Average(), 2));
     }
     
     [HttpGet("highestVotedMovie")]
@@ -88,20 +223,38 @@ public class GroupStatsController : ControllerBase
         
         if (groupMember == null) return Unauthorized();
 
-        var mostPopular = await _dbContext.MovieScores
+        // Get genres from voting games
+        var votingGenres = await _dbContext.MovieScores
             .Where(ms => ms.Game != null && !ms.Game.IsActive && ms.Game.GroupId == groupId)
             .Where(ms => ms.Movie != null)
             .Include(ms => ms.Movie)
-            .GroupBy(ms => ms.Movie!.Genre)
+            .Select(ms => new { ms.Movie!.Genre, Score = ms.MovieScoreValue })
+            .ToListAsync();
+
+        // Get genres from rating guessing games
+        var ratingGames = await _dbContext.RatingGuessingGames
+            .Where(rg => rg.GroupId == groupId && !rg.IsActive)
+            .Include(rg => rg.Movies)
+            .ToListAsync();
+
+        var ratingGenres = ratingGames
+            .SelectMany(rg => rg.Movies)
+            .Select(m => new { m.Genre, Score = 1 }) // Each movie in rating game counts as 1
+            .ToList();
+
+        // Combine both sources
+        var allGenres = votingGenres
+            .Concat(ratingGenres)
+            .GroupBy(x => x.Genre)
             .Select(g => new PopularGenreDto
             {
                 Genre = g.Key.ToString(),
-                TotalScore = g.Sum(ms => ms.MovieScoreValue)
+                TotalScore = g.Sum(x => x.Score)
             })
             .OrderByDescending(g => g.TotalScore)
-            .FirstOrDefaultAsync();
+            .FirstOrDefault();
 
-        return mostPopular == null ? NotFound() : Ok(mostPopular);
+        return allGenres == null ? NotFound() : Ok(allGenres);
     }
     
     [HttpGet("averageMovieScore")]

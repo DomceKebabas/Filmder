@@ -106,12 +106,8 @@ public class AccountController(UserManager<AppUser> userManager, SignInManager<A
             return Ok(new { message = "If this email exists, a reset link has been sent." });
 
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
-
-        var resetUrl = Url.Action(
-            "ResetPassword",
-            "Account",
-            new { email = user.Email, token = token },
-            Request.Scheme);
+        
+        var resetUrl = $"http://localhost:5173/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
 
         await _emailSender.SendEmailAsync(user.Email!, "Reset your Filmder password",
             $"Click to reset your password: {resetUrl}");

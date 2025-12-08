@@ -35,6 +35,7 @@ public class UserController : ControllerBase
 
         return new UserProfileDto
         {
+            Id = user.Id,
             Username = user.UserName,
             Email = user.Email,
             ProfilePictureUrl = user.ProfilePictureUrl
