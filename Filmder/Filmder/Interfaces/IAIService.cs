@@ -9,4 +9,5 @@ public interface IAIService
     Task<PersonalityMatchResultDto> MatchPersonalityToCharacters(PersonalityQuizSubmissionDto submission);
     Task<TasteExplanationDto> ExplainUserTaste(List<UserMovieTasteDto> watchedMovies);
     Task<PersonalizedPlaylistDto> GeneratePersonalizedPlaylist(List<UserMovieTasteDto> recentActivity, int count = 10);
+    Task<MovieTriviaDto> GenerateMovieTrivia(string movieName, int releaseYear, string genre, string director, string description, int questionCount = 10);
 }
