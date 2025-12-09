@@ -81,7 +81,17 @@ public class GroupController(AppDbContext context) : ControllerBase
         var groups = await context.Groups
             .Where(g => context.GroupMembers
                 .Any(m => m.GroupId == g.Id && m.UserId == userId))
-            .Select(g => new { g.Id, g.Name, g.OwnerId })
+            .Select(g => new 
+            { 
+                g.Id, 
+                g.Name, 
+                g.OwnerId,
+                MemberCount = g.GroupMembers.Count,
+                ActiveGamesCount = context.Games.Count(game => game.GroupId == g.Id && game.IsActive)
+                    + context.RatingGuessingGames.Count(rg => rg.GroupId == g.Id && rg.IsActive),
+                TotalGamesCount = context.Games.Count(game => game.GroupId == g.Id)
+                    + context.RatingGuessingGames.Count(rg => rg.GroupId == g.Id)
+            })
             .ToListAsync();
 
         return Ok(groups);
@@ -144,6 +154,7 @@ public class GroupController(AppDbContext context) : ControllerBase
                     m.UserId,
                     m.User.UserName,
                     m.User.Email,
+                    m.User.ProfilePictureUrl,
                     m.JoinedAt
                 }).ToList()
             })
