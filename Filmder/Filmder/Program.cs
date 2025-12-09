@@ -102,7 +102,7 @@ builder.Services.AddRateLimiter(options =>
 
 
 
-builder.Services.AddSingleton<IAIService, GeminiAiService>();
+builder.Services.AddHttpClient<IAIService, GeminiAiService>();
     builder.Services.AddSingleton<TmdbApiService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
