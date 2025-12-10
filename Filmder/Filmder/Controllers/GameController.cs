@@ -4,6 +4,7 @@ using Filmder.DTOs;
 using Filmder.Models;
 using Filmder.Extensions;
 using Filmder.Signal;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
@@ -23,6 +24,7 @@ public class GameController : ControllerBase
     }
 
     [HttpPost("/createAgame")]
+    [Authorize]
     public ActionResult<Game> CreateAGame(CreateGameDto createGameDto)
     {
 
@@ -43,6 +45,7 @@ public class GameController : ControllerBase
     }
     
     [HttpPost("/vote")]
+    [Authorize]
     public async Task<ActionResult> Vote(VoteDto voteDto)
     {
         var game = await _dbContext.Games.Include(g => g.MovieScores).FirstOrDefaultAsync(g => g.Id == voteDto.GameId);
@@ -103,6 +106,7 @@ public class GameController : ControllerBase
     
     
      [HttpGet("/getResults/{gameId}")]
+     [Authorize]
     public async Task<ActionResult<List<Movie>>> GetResults(int gameId)
     {
         var game = await _dbContext.Games
@@ -128,6 +132,7 @@ public class GameController : ControllerBase
     }
     
     [HttpPost("/endGame/{gameId}")]
+    [Authorize]
     public async Task<ActionResult> EndGame(int gameId)
     {
         var game = await _dbContext.Games.FindAsync(gameId);
@@ -144,6 +149,7 @@ public class GameController : ControllerBase
     }
     
     [HttpGet("getActiveGame/{groupId}")]
+    [Authorize]
     public async Task<ActionResult<List<Game>>> GetActiveGames(int groupId)
     {
         var game = await _dbContext.Games
@@ -161,6 +167,7 @@ public class GameController : ControllerBase
     
 
     [HttpGet("getGameResults/{gameId}")]
+    [Authorize]
     public async Task<ActionResult> GetGameResults(int gameId)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -207,6 +214,7 @@ public class GameController : ControllerBase
     }
     
     [HttpGet("getAllGames/{groupId}")]
+    [Authorize]
     public async Task<ActionResult<List<object>>> GetAllGamesByGroup(int groupId)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
