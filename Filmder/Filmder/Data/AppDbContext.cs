@@ -27,6 +27,7 @@ public class AppDbContext(DbContextOptions options) : IdentityDbContext<AppUser>
     public DbSet<HigherLowerGame> HigherLowerGames { get; set; }
     public DbSet<HigherLowerGuess> HigherLowerGuesses { get; set; }
     public DbSet<WatchParty> WatchParties { get; set; }
+    public DbSet<EmojiPuzzle> EmojiPuzzles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

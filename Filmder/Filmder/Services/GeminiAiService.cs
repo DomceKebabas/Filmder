@@ -18,7 +18,7 @@ public class GeminiAiService : IAIService
 
     public async Task<string> GenerateText(string prompt)
     {
-        var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+        var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
         var request = new
         {

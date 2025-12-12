@@ -110,6 +110,7 @@ builder.Services.AddTransient<IEmailSender, EmailSender>();
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<MovieImportService>();
     builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
+    builder.Services.AddScoped<IEmojiPuzzleService, EmojiPuzzleService>();
 
     builder.Services.AddSignalR();
 
