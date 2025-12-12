@@ -9,11 +9,11 @@ public class GeminiAiService : IAIService
     private readonly HttpClient _http;
     private readonly string _apiKey;
 
-    public GeminiAiService(IConfiguration config)
-    {
-        _http = new HttpClient();
-        _apiKey = config["Gemini:ApiKey"] ?? throw new Exception("API Key is missing");
-    }
+    public GeminiAiService(HttpClient http, IConfiguration config)
+{
+    _http = http;
+    _apiKey = config["Gemini:ApiKey"] ?? throw new Exception("API Key is missing");
+}
 
 
     public async Task<string> GenerateText(string prompt)
