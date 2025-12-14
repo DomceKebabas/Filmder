@@ -1,10 +1,10 @@
-using System.Globalization;
 using System.Text;
 using System.Threading.RateLimiting;
 using Filmder.Data;
 using Filmder.Interfaces;
 using Filmder.Middleware;
 using Filmder.Models;
+using Filmder.Repositories;
 using Filmder.Services;
 using Filmder.Signal;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -44,8 +44,7 @@ builder.Services.AddSwaggerGen(options =>
         Title = "Filmder API",
         Description = "API for Filmder application"
     });
-
-    // Add JWT Authentication to Swagger
+    
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
@@ -97,21 +96,18 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-
-
-
-
-
-builder.Services.AddHttpClient<IAIService, GeminiAiService>();
+    builder.Services.AddHttpClient<IAIService, GeminiAiService>();
     builder.Services.AddSingleton<TmdbApiService>();
 
-builder.Services.AddTransient<IEmailSender, EmailSender>();
-builder.Services.AddScoped<SupabaseService>();
+    builder.Services.AddTransient<IEmailSender, EmailSender>();
+    builder.Services.AddScoped<SupabaseService>();
 
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<MovieImportService>();
     builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
     builder.Services.AddScoped<IEmojiPuzzleService, EmojiPuzzleService>();
+    builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+    builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
     builder.Services.AddSignalR();
 
@@ -179,7 +175,6 @@ builder.Services.AddScoped<SupabaseService>();
         app.UseSwagger();
         app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "Filmder API V1"); });
     }
-
 
     app.UseHttpsRedirection();
 
