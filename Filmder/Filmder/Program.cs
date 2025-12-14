@@ -5,6 +5,7 @@ using Filmder.Data;
 using Filmder.Interfaces;
 using Filmder.Middleware;
 using Filmder.Models;
+using Filmder.Repositories;
 using Filmder.Services;
 using Filmder.Signal;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -112,6 +113,8 @@ builder.Services.AddScoped<SupabaseService>();
     builder.Services.AddScoped<MovieImportService>();
     builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
     builder.Services.AddScoped<IEmojiPuzzleService, EmojiPuzzleService>();
+    builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+    builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
     builder.Services.AddSignalR();
 
