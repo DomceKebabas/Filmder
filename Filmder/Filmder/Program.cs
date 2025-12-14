@@ -110,8 +110,25 @@ builder.Services.AddRateLimiter(options =>
     builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
     builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
-    builder.Services.AddScoped<ITasteExplainerRepository, TasteExplainerRepository>();
-    builder.Services.AddScoped<ITasteExplainerService, TasteExplainerService>();
+    builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+    builder.Services.AddScoped<IAccountService, AccountService>();
+    builder.Services.AddScoped<IEmojiPuzzleRepository, EmojiPuzzleRepository>();
+    builder.Services.AddScoped<IEmojiGameService, EmojiGameService>();
+    builder.Services.AddScoped<IGameRepository, GameRepository>();
+    builder.Services.AddScoped<IGameService, GameService>();
+    builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+    builder.Services.AddScoped<IGroupService, GroupService>();
+    builder.Services.AddScoped<IGroupStatsRepository, GroupStatsRepository>();
+    builder.Services.AddScoped<IGroupStatsService, GroupStatsService>();
+    builder.Services.AddScoped<IGuessRatingGameRepository, GuessRatingGameRepository>();
+    builder.Services.AddScoped<IGuessRatingGameService, GuessRatingGameService>();
+    builder.Services.AddScoped<IHigherLowerRepository, HigherLowerRepository>();
+    builder.Services.AddScoped<IHigherLowerService, HigherLowerService>();
+    builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+    builder.Services.AddScoped<IMessageService, MessageService>();
+
+
+
 
     builder.Services.AddSignalR();
 
