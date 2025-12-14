@@ -106,6 +106,7 @@ builder.Services.AddRateLimiter(options =>
     builder.Services.AddScoped<MovieImportService>();
     builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
     builder.Services.AddScoped<IEmojiPuzzleService, EmojiPuzzleService>();
+
     builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
     builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
