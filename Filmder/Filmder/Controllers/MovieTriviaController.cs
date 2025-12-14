@@ -1,11 +1,9 @@
 using System.Security.Claims;
-using Filmder.Data;
 using Filmder.DTOs;
-using Filmder.Interfaces;
+using Filmder.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 
 namespace Filmder.Controllers;
 
@@ -15,34 +13,17 @@ namespace Filmder.Controllers;
 [Authorize]
 public class MovieTriviaController : ControllerBase
 {
-    private readonly AppDbContext _context;
-    private readonly IAIService _aiService;
-    private static readonly Dictionary<string, MovieTriviaDto> _triviaCache = new();
+    private readonly IMovieTriviaService _movieTriviaService;
 
-    public MovieTriviaController(AppDbContext context, IAIService aiService)
+    public MovieTriviaController(IMovieTriviaService movieTriviaService)
     {
-        _context = context;
-        _aiService = aiService;
+        _movieTriviaService = movieTriviaService;
     }
 
     [HttpGet("available-movies")]
-    public async Task<ActionResult<List<object>>> GetAvailableMovies()
+    public async Task<ActionResult<List<AvailableMovieDto>>> GetAvailableMovies()
     {
-        var movies = await _context.Movies
-            .OrderByDescending(m => m.Rating)
-            .Take(50)
-            .Select(m => new
-            {
-                m.Id,
-                m.Name,
-                m.Genre,
-                m.ReleaseYear,
-                m.Rating,
-                m.PosterUrl,
-                m.Director
-            })
-            .ToListAsync();
-
+        var movies = await _movieTriviaService.GetAvailableMoviesAsync();
         return Ok(movies);
     }
 
@@ -57,97 +38,34 @@ public class MovieTriviaController : ControllerBase
             return BadRequest(new { message = "Question count must be between 5 and 20" });
         }
 
-        var movie = await _context.Movies.FindAsync(movieId);
-        if (movie == null)
-        {
-            return NotFound(new { message = "Movie not found" });
-        }
+        var (success, errorMessage, statusCode, trivia) = await _movieTriviaService.GenerateTriviaAsync(userId, movieId, questionCount);
 
-        try
+        if (!success)
         {
-            var trivia = await _aiService.GenerateMovieTrivia(
-                movie.Name,
-                movie.ReleaseYear,
-                movie.Genre.ToString(),
-                movie.Director,
-                movie.Description,
-                questionCount
-            );
-
-            if (trivia == null || !trivia.Questions.Any())
+            return statusCode switch
             {
-                return StatusCode(500, new { message = "Failed to generate trivia questions" });
-            }
-
-            var cacheKey = $"{userId}_{movieId}";
-            _triviaCache[cacheKey] = trivia;
-
-            return Ok(trivia);
+                404 => NotFound(new { message = errorMessage }),
+                500 => StatusCode(500, new { message = "Error generating trivia", details = errorMessage }),
+                _ => BadRequest(new { message = errorMessage })
+            };
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Error generating trivia", details = ex.Message });
-        }
+
+        return Ok(trivia);
     }
 
     [HttpPost("submit")]
-    public Task<ActionResult<TriviaResultDto>> SubmitAnswers([FromBody] TriviaSubmissionDto submission)
+    public ActionResult<TriviaResultDto> SubmitAnswers([FromBody] TriviaSubmissionDto submission)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null) return Task.FromResult<ActionResult<TriviaResultDto>>(Unauthorized());
+        if (userId == null) return Unauthorized();
 
-        if (submission.Answers == null || !submission.Answers.Any())
+        var (success, errorMessage, statusCode, result) = _movieTriviaService.SubmitAnswers(userId, submission);
+
+        if (!success)
         {
-            return Task.FromResult<ActionResult<TriviaResultDto>>(BadRequest(new { message = "No answers provided" }));
+            return BadRequest(new { message = errorMessage });
         }
 
-        var cacheKey = $"{userId}_{submission.MovieId}";
-        if (!_triviaCache.TryGetValue(cacheKey, out var trivia))
-        {
-            return Task.FromResult<ActionResult<TriviaResultDto>>(
-                BadRequest(new { message = "No questions found. Generate trivia first." }));
-        }
-
-        int correctCount = 0;
-        var results = new List<QuestionResultDto>();
-
-        foreach (var answer in submission.Answers)
-        {
-            if (answer.QuestionIndex >= 0 && answer.QuestionIndex < trivia.Questions.Count)
-            {
-                var question = trivia.Questions[answer.QuestionIndex];
-                bool isCorrect = answer.SelectedAnswerIndex == question.CorrectAnswerIndex;
-                
-                if (isCorrect) correctCount++;
-
-                results.Add(new QuestionResultDto
-                {
-                    Question = question.Question,
-                    IsCorrect = isCorrect,
-                    UserAnswer = question.Options[answer.SelectedAnswerIndex],
-                    CorrectAnswer = question.Options[question.CorrectAnswerIndex]
-                });
-            }
-        }
-
-        _triviaCache.Remove(cacheKey);
-
-        double score = Math.Round((double)correctCount / trivia.Questions.Count * 100, 1);
-
-        var result = new TriviaResultDto
-        {
-            TotalQuestions = trivia.Questions.Count,
-            CorrectAnswers = correctCount,
-            Score = score,
-            QuestionResults = results
-        };
-
-        return Task.FromResult<ActionResult<TriviaResultDto>>(Ok(result));
+        return Ok(result);
     }
-}
-
-public class TriviaSubmissionDto
-{
-    public int MovieId { get; set; }
-    public List<TriviaAnswerDto> Answers { get; set; } = new();
 }
