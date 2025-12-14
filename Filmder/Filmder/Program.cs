@@ -152,6 +152,12 @@ builder.Services.AddRateLimiter(options =>
     builder.Services.AddScoped<IMovieService, MovieService>();
     builder.Services.AddScoped<IRatingService, RatingService>();
 
+    builder.Services.AddScoped<ISwipeRepository, SwipeRepository>();
+    builder.Services.AddScoped<ISwipeService, SwipeService>();
+
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IUserService, UserService>();
+
     builder.Services.AddSignalR();
 
     builder.Services.AddIdentityCore<AppUser>(opt =>

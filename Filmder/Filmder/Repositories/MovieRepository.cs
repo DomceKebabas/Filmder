@@ -77,4 +77,49 @@ public class MovieRepository : IMovieRepository
     {
         await _context.SaveChangesAsync();
     }
+    
+    public async Task<bool> ExistsAsync(int movieId)
+    {
+        return await _context.Movies.AnyAsync(m => m.Id == movieId);
+    }
+
+    public async Task<Movie?> GetRandomMovieAsync(List<int> excludeIds, string? genre, int? minYear, int? maxDuration)
+    {
+        var query = _context.Movies.AsQueryable();
+
+        if (excludeIds.Any())
+        {
+            query = query.Where(m => !excludeIds.Contains(m.Id));
+        }
+
+        if (!string.IsNullOrEmpty(genre))
+        {
+            if (Enum.TryParse<MovieGenre>(genre, true, out var parsedGenre))
+            {
+                query = query.Where(m => m.Genre == parsedGenre);
+            }
+        }
+
+        if (minYear.HasValue)
+        {
+            query = query.Where(m => m.ReleaseYear >= minYear.Value);
+        }
+
+        if (maxDuration.HasValue)
+        {
+            query = query.Where(m => m.Duration <= maxDuration.Value);
+        }
+
+        var totalMovies = await query.CountAsync();
+        
+        if (totalMovies == 0)
+            return null;
+
+        var random = new Random();
+        var randomSkip = random.Next(0, totalMovies);
+        
+        return await query
+            .Skip(randomSkip)
+            .FirstOrDefaultAsync();
+    }
 }

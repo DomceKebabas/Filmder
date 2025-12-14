@@ -13,4 +13,7 @@ public interface IMovieRepository
     Task AddAsync(Movie movie);
     Task DeleteAsync(Movie movie);
     Task SaveChangesAsync();
+    
+    Task<bool> ExistsAsync(int movieId);
+    Task<Movie?> GetRandomMovieAsync(List<int> excludeIds, string? genre, int? minYear, int? maxDuration);
 }
