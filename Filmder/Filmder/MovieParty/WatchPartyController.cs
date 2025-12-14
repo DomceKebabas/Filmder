@@ -27,31 +27,58 @@ public class WatchPartyController : ControllerBase
     public async Task<ActionResult<WatchPartyDto>> CreateWatchParty(int groupId, [FromBody] CreateWatchPartyDto dto)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null) return Unauthorized();
+        if (userId == null) 
+        {
+            _logger.LogWarning("Unauthorized watch party creation attempt");
+            return Unauthorized();
+        }
 
         var isMember = await _context.GroupMembers
             .AnyAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
 
         if (!isMember)
-            return Forbid("You must be a member of this group to create a watch party.");
-
-        var watchParty = new WatchParty
         {
-            GroupId = groupId,
-            HostUserId = userId,
-            MovieTitle = dto.MovieTitle,
-            Platform = dto.Platform,
-            ScheduledTime = dto.ScheduledTime,
-            VideoUrl = dto.VideoUrl,
-            Status = WatchPartyStatus.Scheduled,
-            CreatedAt = DateTime.UtcNow
-        };
+            _logger.LogWarning("User {UserId} attempted to create watch party for group {GroupId} without membership", userId, groupId);
+            return Forbid("You must be a member of this group to create a watch party.");
+        }
 
-        _context.WatchParties.Add(watchParty);
-        await _context.SaveChangesAsync();
+        if (dto.ScheduledTime <= DateTime.UtcNow)
+        {
+            return BadRequest("Scheduled time must be in the future.");
+        }
 
-        var result = await GetWatchPartyDto(watchParty.Id);
-        return CreatedAtAction(nameof(GetWatchParty), new { id = watchParty.Id }, result);
+        if (string.IsNullOrWhiteSpace(dto.MovieTitle))
+        {
+            return BadRequest("Movie title is required.");
+        }
+
+        try
+        {
+            var watchParty = new WatchParty
+            {
+                GroupId = groupId,
+                HostUserId = userId,
+                MovieTitle = dto.MovieTitle,
+                Platform = dto.Platform,
+                ScheduledTime = dto.ScheduledTime,
+                VideoUrl = dto.VideoUrl,
+                Status = WatchPartyStatus.Scheduled,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.WatchParties.Add(watchParty);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Watch party {PartyId} created by user {UserId} for group {GroupId}", watchParty.Id, userId, groupId);
+
+            var result = await GetWatchPartyDto(watchParty.Id);
+            return CreatedAtAction(nameof(GetWatchParty), new { id = watchParty.Id }, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating watch party for group {GroupId}", groupId);
+            return StatusCode(500, "An error occurred while creating the watch party.");
+        }
     }
 
     [HttpGet("group/{groupId}")]
@@ -64,30 +91,41 @@ public class WatchPartyController : ControllerBase
             .AnyAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
 
         if (!isMember)
+        {
+            _logger.LogWarning("User {UserId} attempted to view watch parties for group {GroupId} without membership", userId, groupId);
             return Forbid("You must be a member of this group to view watch parties.");
+        }
 
-        var parties = await _context.WatchParties
-            .Include(wp => wp.Host)
-            .Include(wp => wp.Group)
-            .Where(wp => wp.GroupId == groupId)
-            .OrderBy(wp => wp.ScheduledTime)
-            .Select(wp => new WatchPartyDto
-            {
-                Id = wp.Id,
-                MovieTitle = wp.MovieTitle,
-                Platform = wp.Platform,
-                ScheduledTime = wp.ScheduledTime,
-                Status = wp.Status,
-                VideoUrl = wp.VideoUrl,
-                HostName = wp.Host.UserName ?? "Unknown",
-                HostUserId = wp.HostUserId,
-                GroupName = wp.Group.Name,
-                GroupId = wp.GroupId,
-                CreatedAt = wp.CreatedAt
-            })
-            .ToListAsync();
+        try
+        {
+            var parties = await _context.WatchParties
+                .Include(wp => wp.Host)
+                .Include(wp => wp.Group)
+                .Where(wp => wp.GroupId == groupId)
+                .OrderBy(wp => wp.ScheduledTime)
+                .Select(wp => new WatchPartyDto
+                {
+                    Id = wp.Id,
+                    MovieTitle = wp.MovieTitle,
+                    Platform = wp.Platform,
+                    ScheduledTime = wp.ScheduledTime,
+                    Status = wp.Status,
+                    VideoUrl = wp.VideoUrl,
+                    HostName = wp.Host.UserName ?? "Unknown",
+                    HostUserId = wp.HostUserId,
+                    GroupName = wp.Group.Name,
+                    GroupId = wp.GroupId,
+                    CreatedAt = wp.CreatedAt
+                })
+                .ToListAsync();
 
-        return Ok(parties);
+            return Ok(parties);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving watch parties for group {GroupId}", groupId);
+            return StatusCode(500, "An error occurred while retrieving watch parties.");
+        }
     }
 
     [HttpGet("{id}")]
@@ -100,16 +138,32 @@ public class WatchPartyController : ControllerBase
             .Include(wp => wp.Group)
             .FirstOrDefaultAsync(wp => wp.Id == id);
 
-        if (party == null) return NotFound();
+        if (party == null) 
+        {
+            _logger.LogWarning("Watch party {PartyId} not found", id);
+            return NotFound("Watch party not found.");
+        }
 
+        // CRITICAL: Verify user is a member of the group
         var isMember = await _context.GroupMembers
             .AnyAsync(gm => gm.GroupId == party.GroupId && gm.UserId == userId);
 
         if (!isMember)
+        {
+            _logger.LogWarning("User {UserId} attempted to access watch party {PartyId} without group membership", userId, id);
             return Forbid("You must be a member of this group to view this watch party.");
+        }
 
-        var result = await GetWatchPartyDto(id);
-        return Ok(result);
+        try
+        {
+            var result = await GetWatchPartyDto(id);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving watch party {PartyId}", id);
+            return StatusCode(500, "An error occurred while retrieving the watch party.");
+        }
     }
 
     [HttpDelete("{id}")]
@@ -122,19 +176,37 @@ public class WatchPartyController : ControllerBase
             .Include(wp => wp.Group)
             .FirstOrDefaultAsync(wp => wp.Id == id);
 
-        if (party == null) return NotFound();
+        if (party == null) 
+        {
+            _logger.LogWarning("Watch party {PartyId} not found for deletion", id);
+            return NotFound("Watch party not found.");
+        }
 
         var isHost = party.HostUserId == userId;
-        var isAdmin = await _context.GroupMembers
-            .AnyAsync(gm => gm.GroupId == party.GroupId && gm.UserId == userId);
+        
+        var group = await _context.Groups.FindAsync(party.GroupId);
+        var isGroupOwner = group?.OwnerId == userId;
 
-        if (!isHost && !isAdmin)
-            return Forbid("Only the host or group admin can delete this watch party.");
+        if (!isHost && !isGroupOwner)
+        {
+            _logger.LogWarning("User {UserId} attempted to delete watch party {PartyId} without permission", userId, id);
+            return Forbid("Only the host or group owner can delete this watch party.");
+        }
 
-        _context.WatchParties.Remove(party);
-        await _context.SaveChangesAsync();
+        try
+        {
+            _context.WatchParties.Remove(party);
+            await _context.SaveChangesAsync();
 
-        return NoContent();
+            _logger.LogInformation("Watch party {PartyId} deleted by user {UserId}", id, userId);
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting watch party {PartyId}", id);
+            return StatusCode(500, "An error occurred while deleting the watch party.");
+        }
     }
 
     [HttpPost("{id}/join")]
@@ -147,28 +219,52 @@ public class WatchPartyController : ControllerBase
             .Include(wp => wp.Group)
             .FirstOrDefaultAsync(wp => wp.Id == id);
 
-        if (party == null) return NotFound();
+        if (party == null) 
+        {
+            _logger.LogWarning("Watch party {PartyId} not found for join", id);
+            return NotFound("Watch party not found.");
+        }
 
+        // CRITICAL: Verify user is a member of the group
         var isMember = await _context.GroupMembers
             .AnyAsync(gm => gm.GroupId == party.GroupId && gm.UserId == userId);
 
         if (!isMember)
+        {
+            _logger.LogWarning("User {UserId} attempted to join watch party {PartyId} without group membership", userId, id);
             return Forbid("You must be a member of this group to join this watch party.");
+        }
 
         var now = DateTime.UtcNow;
         var timeDiff = (party.ScheduledTime - now).TotalMinutes;
 
-        if (timeDiff > 15 && party.Status != WatchPartyStatus.Active)
-            return BadRequest("This watch party hasn't started yet. You can join 15 minutes before the scheduled time.");
-
-        if (party.Status == WatchPartyStatus.Scheduled && timeDiff <= 15)
+        if (party.Status == WatchPartyStatus.Completed)
         {
-            party.Status = WatchPartyStatus.Active;
-            await _context.SaveChangesAsync();
+            return BadRequest("This watch party has already ended.");
         }
 
-        var result = await GetWatchPartyDto(id);
-        return Ok(result);
+        if (timeDiff > 15 && party.Status != WatchPartyStatus.Active)
+        {
+            return BadRequest($"This watch party hasn't started yet. You can join {Math.Ceiling(timeDiff - 15)} minutes before the scheduled time.");
+        }
+
+        try
+        {
+            if (party.Status == WatchPartyStatus.Scheduled && timeDiff <= 15)
+            {
+                party.Status = WatchPartyStatus.Active;
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Watch party {PartyId} auto-activated by user {UserId}", id, userId);
+            }
+
+            var result = await GetWatchPartyDto(id);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error joining watch party {PartyId}", id);
+            return StatusCode(500, "An error occurred while joining the watch party.");
+        }
     }
 
     [HttpPut("{id}/status")]
@@ -178,15 +274,64 @@ public class WatchPartyController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var party = await _context.WatchParties.FindAsync(id);
-        if (party == null) return NotFound();
+        if (party == null) 
+        {
+            _logger.LogWarning("Watch party {PartyId} not found for status update", id);
+            return NotFound("Watch party not found.");
+        }
 
         if (party.HostUserId != userId)
+        {
+            _logger.LogWarning("User {UserId} attempted to update status of watch party {PartyId} without being host", userId, id);
             return Forbid("Only the host can update the party status.");
+        }
 
-        party.Status = status;
-        await _context.SaveChangesAsync();
+        try
+        {
+            party.Status = status;
+            await _context.SaveChangesAsync();
 
-        return NoContent();
+            _logger.LogInformation("Watch party {PartyId} status updated to {Status} by user {UserId}", id, status, userId);
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating watch party {PartyId} status", id);
+            return StatusCode(500, "An error occurred while updating the watch party status.");
+        }
+    }
+
+ 
+    [HttpGet("{id}/extension-url")]
+    public async Task<ActionResult<string>> GetExtensionUrl(int id)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return Unauthorized();
+
+        var party = await _context.WatchParties
+            .Include(wp => wp.Group)
+            .FirstOrDefaultAsync(wp => wp.Id == id);
+
+        if (party == null) return NotFound("Watch party not found.");
+
+        var isMember = await _context.GroupMembers
+            .AnyAsync(gm => gm.GroupId == party.GroupId && gm.UserId == userId);
+
+        if (!isMember)
+        {
+            return Forbid("You must be a member of this group to access this watch party.");
+        }
+
+        if (string.IsNullOrEmpty(party.VideoUrl))
+        {
+            return BadRequest("This watch party doesn't have a video URL set.");
+        }
+
+        var separator = party.VideoUrl.Contains('?') ? '&' : '?';
+        var urlWithParty = $"{party.VideoUrl}{separator}filmder_party={id}";
+
+        return Ok(urlWithParty);
     }
 
     private async Task<WatchPartyDto> GetWatchPartyDto(int id)
