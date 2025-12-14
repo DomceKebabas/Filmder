@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Filmder.Data;
 using Filmder.DTOs;
 using Filmder.Models;
+using Filmder.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -16,11 +17,13 @@ public class UserController : ControllerBase
 {
     private readonly UserManager<AppUser> _userManager;
     private readonly AppDbContext _dbContext;
+    private readonly SupabaseService _storage;
 
-    public UserController(UserManager<AppUser> userManager, AppDbContext dbContext)
+    public UserController(UserManager<AppUser> userManager, AppDbContext dbContext, SupabaseService storage)
     {
         _userManager = userManager;
         _dbContext = dbContext;
+        _storage = storage;
     }
 
     
@@ -169,71 +172,77 @@ public async Task<ActionResult<UserStatsDto>> GetLoggedInUserStatsAsync()
     public async Task<IActionResult> UploadProfilePicture(IFormFile file)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null) return Unauthorized();
+        if (userId == null)
+            return Unauthorized();
 
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded");
 
-        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        var allowedTypes = new[]
+        {
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/svg+xml"
+        };
+
         if (!allowedTypes.Contains(file.ContentType.ToLower()))
-            return BadRequest("Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.");
+            return BadRequest("Invalid file type");
 
         if (file.Length > 5 * 1024 * 1024)
-            return BadRequest("File size must be less than 5MB");
+            return BadRequest("File size must be under 5MB");
 
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) return NotFound();
+        if (user == null)
+            return NotFound();
 
-        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "avatars");
-        if (!Directory.Exists(uploadsFolder))
-            Directory.CreateDirectory(uploadsFolder);
-
-        // for deleting old picture
         if (!string.IsNullOrEmpty(user.ProfilePictureUrl))
         {
-            var oldFileName = Path.GetFileName(user.ProfilePictureUrl);
-            var oldFilePath = Path.Combine(uploadsFolder, oldFileName);
-            if (System.IO.File.Exists(oldFilePath))
-                System.IO.File.Delete(oldFilePath);
+            await _storage.DeleteProfilePictureByUrlAsync(
+                user.ProfilePictureUrl
+            );
         }
 
-        var fileExtension = Path.GetExtension(file.FileName);
-        var fileName = $"{userId}_{DateTime.UtcNow.Ticks}{fileExtension}";
-        var filePath = Path.Combine(uploadsFolder, fileName);
+        var url = await _storage.UploadProfilePictureAsync(userId, file);
+        if (url == null)
+            return StatusCode(500, "Upload failed");
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        var profilePictureUrl = $"/uploads/avatars/{fileName}";
-        user.ProfilePictureUrl = profilePictureUrl;
+        user.ProfilePictureUrl = url;
         await _userManager.UpdateAsync(user);
 
-        return Ok(new { message = "Profile picture uploaded successfully", profilePictureUrl });
+        return Ok(new
+        {
+            message = "Profile picture uploaded successfully",
+            profilePictureUrl = url
+        });
     }
-    
+
     [HttpDelete("profile-picture")]
     public async Task<IActionResult> DeleteProfilePicture()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userId == null) return Unauthorized();
+        if (userId == null)
+            return Unauthorized();
 
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) return NotFound();
+        if (user == null)
+            return NotFound();
 
         if (!string.IsNullOrEmpty(user.ProfilePictureUrl))
         {
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "avatars");
-            var fileName = Path.GetFileName(user.ProfilePictureUrl);
-            var filePath = Path.Combine(uploadsFolder, fileName);
-            if (System.IO.File.Exists(filePath))
-                System.IO.File.Delete(filePath);
+            await _storage.DeleteProfilePictureByUrlAsync(
+                user.ProfilePictureUrl
+            );
+
+            user.ProfilePictureUrl = null;
+            await _userManager.UpdateAsync(user);
         }
 
-        user.ProfilePictureUrl = null;
-        await _userManager.UpdateAsync(user);
-
-        return Ok(new { message = "Profile picture removed successfully" });
+        return Ok(new
+        {
+            message = "Profile picture removed successfully"
+        });
     }
 }
+

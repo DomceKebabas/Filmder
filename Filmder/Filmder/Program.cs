@@ -106,6 +106,7 @@ builder.Services.AddHttpClient<IAIService, GeminiAiService>();
     builder.Services.AddSingleton<TmdbApiService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
+builder.Services.AddScoped<SupabaseService>();
 
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<MovieImportService>();
