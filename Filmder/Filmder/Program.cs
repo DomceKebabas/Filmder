@@ -110,25 +110,47 @@ builder.Services.AddRateLimiter(options =>
     builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
     builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
+    builder.Services.AddScoped<ITasteExplainerRepository, TasteExplainerRepository>();
+    builder.Services.AddScoped<ITasteExplainerService, TasteExplainerService>();
+
     builder.Services.AddScoped<IAccountRepository, AccountRepository>();
     builder.Services.AddScoped<IAccountService, AccountService>();
+
     builder.Services.AddScoped<IEmojiPuzzleRepository, EmojiPuzzleRepository>();
     builder.Services.AddScoped<IEmojiGameService, EmojiGameService>();
+
     builder.Services.AddScoped<IGameRepository, GameRepository>();
     builder.Services.AddScoped<IGameService, GameService>();
+
     builder.Services.AddScoped<IGroupRepository, GroupRepository>();
     builder.Services.AddScoped<IGroupService, GroupService>();
+
     builder.Services.AddScoped<IGroupStatsRepository, GroupStatsRepository>();
     builder.Services.AddScoped<IGroupStatsService, GroupStatsService>();
+
     builder.Services.AddScoped<IGuessRatingGameRepository, GuessRatingGameRepository>();
     builder.Services.AddScoped<IGuessRatingGameService, GuessRatingGameService>();
+
     builder.Services.AddScoped<IHigherLowerRepository, HigherLowerRepository>();
     builder.Services.AddScoped<IHigherLowerService, HigherLowerService>();
+
     builder.Services.AddScoped<IMessageRepository, MessageRepository>();
     builder.Services.AddScoped<IMessageService, MessageService>();
 
+    builder.Services.AddScoped<IPersonalizedPlaylistRepository, PersonalizedPlaylistRepository>();
+    builder.Services.AddScoped<IPersonalizedPlaylistService, PersonalizedPlaylistService>();
 
+    builder.Services.AddScoped<IPersonalityMatchRepository, PersonalityMatchRepository>();
+    builder.Services.AddScoped<IPersonalityMatchService, PersonalityMatchService>();
 
+    builder.Services.AddScoped<IMovieTriviaRepository, MovieTriviaRepository>();
+    builder.Services.AddScoped<IMovieTriviaService, MovieTriviaService>();
+
+    builder.Services.AddScoped<IMovieRepository, MovieRepository>();
+    builder.Services.AddScoped<IRatingRepository, RatingRepository>();
+
+    builder.Services.AddScoped<IMovieService, MovieService>();
+    builder.Services.AddScoped<IRatingService, RatingService>();
 
     builder.Services.AddSignalR();
 
