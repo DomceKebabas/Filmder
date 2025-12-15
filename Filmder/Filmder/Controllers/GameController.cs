@@ -52,7 +52,6 @@ public class GameController(IGameService gameService) : ControllerBase
     }
 
     [HttpPost("/endGame/{gameId}")]
-    [Authorize]
     public async Task<ActionResult> EndGame(int gameId)
     {
         await gameService.EndGameAsync(gameId);

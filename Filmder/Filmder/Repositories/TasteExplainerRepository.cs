@@ -46,4 +46,12 @@ public class TasteExplainerRepository : ITasteExplainerRepository
             .Include(um => um.Movie)
             .ToListAsync();
     }
+    
+    public async Task<List<SwipeHistory>> GetLikedSwipesWithMovieAsync(string userId)
+    {
+        return await _context.SwipeHistories
+            .Where(s => s.UserId == userId && s.IsLike)
+            .Include(s => s.Movie)
+            .ToListAsync();
+    }
 }
