@@ -1,29 +1,32 @@
+using Filmder.Data;
 using Filmder.Models;
 using Filmder.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
-namespace Filmder.Services;
+namespace Filmder.Repositories;
 
-public class EmojiPuzzleRepository : IEmojiPuzzleRepository
+public class EmojiPuzzleRepository(AppDbContext context) : IEmojiPuzzleRepository
 {
-    private readonly List<EmojiPuzzle> _puzzles = new();
-
     public async Task<EmojiPuzzle?> GetRandomPuzzleAsync(Difficulty difficulty)
     {
-        var puzzles = _puzzles.Where(p => p.Difficulty == difficulty).ToList();
+        var puzzles = await context.EmojiPuzzles
+            .Where(p => p.Difficulty == difficulty && p.IsActive)
+            .ToListAsync();
 
-        if (!puzzles.Any())
+        if (puzzles.Count == 0)
             return null;
 
         var index = Random.Shared.Next(puzzles.Count);
-        return await Task.FromResult(puzzles[index]);
+        return puzzles[index];
     }
 
     public async Task<IEnumerable<EmojiPuzzle>> GetAllPuzzlesAsync(Difficulty? difficulty)
     {
-        var result = difficulty == null
-            ? _puzzles
-            : _puzzles.Where(p => p.Difficulty == difficulty);
+        var query = context.EmojiPuzzles.Where(p => p.IsActive);
 
-        return await Task.FromResult(result);
+        if (difficulty.HasValue)
+            query = query.Where(p => p.Difficulty == difficulty.Value);
+
+        return await query.ToListAsync();
     }
 }

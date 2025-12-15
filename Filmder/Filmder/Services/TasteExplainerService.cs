@@ -71,25 +71,34 @@ public class TasteExplainerService : ITasteExplainerService
     {
         var userRatings = await _repository.GetUserRatingsAsync(userId);
         var userMovies = await _repository.GetUserMoviesAsync(userId);
+        var likedSwipes = await _repository.GetLikedSwipesWithMovieAsync(userId);
 
         var ratingsByMovieId = userRatings.ToDictionary(r => r.MovieId);
+        
+        var allMovieIds = userRatings.Select(r => r.MovieId)
+            .Union(likedSwipes.Select(s => s.MovieId))
+            .Union(userMovies.Select(um => um.MovieId))
+            .Distinct()
+            .ToList();
+        
+        var allMovies = userRatings.Select(r => r.Movie)
+            .Union(likedSwipes.Select(s => s.Movie))
+            .Union(userMovies.Select(um => um.Movie))
+            .Where(m => m != null)
+            .DistinctBy(m => m.Id)
+            .ToList();
 
         var summary = new
         {
-            totalWatched = userMovies.Count,
+            totalWatched = allMovieIds.Count,
             totalRated = userRatings.Count,
             averageRating = userRatings.Any() ? Math.Round(userRatings.Average(r => r.Score), 1) : 0,
-            favoriteGenre = userRatings.Any()
-                ? userRatings
-                    .GroupBy(r => r.Movie.Genre)
+            favoriteGenre = allMovies.Any()
+                ? allMovies
+                    .GroupBy(m => m.Genre)
                     .OrderByDescending(g => g.Count())
                     .FirstOrDefault()?.Key.ToString() ?? "None yet"
-                : userMovies.Any()
-                    ? userMovies
-                        .GroupBy(um => um.Movie.Genre)
-                        .OrderByDescending(g => g.Count())
-                        .FirstOrDefault()?.Key.ToString() ?? "None yet"
-                    : "None yet",
+                : "None yet",
             recentlyWatched = userMovies
                 .OrderByDescending(um => um.WatchedAt)
                 .Take(5)

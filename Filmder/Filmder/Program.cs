@@ -105,7 +105,6 @@ builder.Services.AddRateLimiter(options =>
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<MovieImportService>();
     builder.Services.AddScoped<IMovieCacheService, MovieCacheService>();
-    builder.Services.AddScoped<IEmojiPuzzleService, EmojiPuzzleService>();
 
     builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
     builder.Services.AddScoped<IWatchlistService, WatchlistService>();
@@ -157,6 +156,9 @@ builder.Services.AddRateLimiter(options =>
 
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IUserService, UserService>();
+
+    builder.Services.AddScoped<IMoodRepository, MoodRepository>();
+    builder.Services.AddScoped<IMoodService, MoodService>();
 
     builder.Services.AddSignalR();
 
