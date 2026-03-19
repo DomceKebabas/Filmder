@@ -1,58 +1,51 @@
-# Filmder – Film Tinder
 
-A movie recommendation app where groups of friends swipe through films together to find something to watch.
+## Overview
+**Filmder** is a social movie platform backend designed to help groups decide what to watch faster.
+#Project Demo: https://youtu.be/1tPNNiYGozk
+
+Choosing a movie in a group is usually messy: everyone has different preferences, conversations get fragmented, and decision fatigue slows everything down. 
+Filmder solves this by combining structured discovery flows (swipes, ratings, watchlists), social coordination (groups + real-time chat), 
+and personalization features (taste analysis and AI-assisted recommendation endpoints).
+
+
+## Key Features
+- **Secure authentication:** JWT-based login and protected endpoints.
+- **Group collaboration:** group creation, membership flows, and shared movie actions.
+- **Interactive discovery:** swipe and rating features to make movie selection engaging.
+- **Watchlist management:** save and track movies for future viewing.
+- **Real-time communication:** SignalR hubs for chat and watch-party coordination.
+- **Mini-games:** higher/lower, emoji game, movie trivia, and guess-rating endpoints.
+- **AI + external integrations:** TMDB movie data and Gemini-powered recommendation/taste experiences.
+- **Media storage integration:** Supabase + bucket-based profile picture storage.
+- **Production-minded engineering:** centralized exception middleware, rate limiting, structured logging, and test coverage via xUnit.
 
 ## Tech Stack
+- **Backend:** C#, ASP.NET Core 9 Web API, SignalR, ASP.NET Identity
+- **Database:** PostgreSQL, Entity Framework Core
+- **Authentication & Security:** JWT Bearer, Identity roles, ASP.NET rate limiting
+- **External Services:**
+  - TMDB API (movie metadata and discovery)
+  - Gemini API (AI-assisted recommendation/taste features)
+  - Supabase (storage integration)
+  - Supabase Buckets (profile picture asset storage)
+  - SMTP email provider (account recovery and communication workflows)
+- **Observability & Docs:** Serilog, Swagger/OpenAPI
+- **Testing & Tooling:** xUnit, Moq-style mocking patterns, Docker
 
-- ASP.NET Core 9.0
-- SQLite with Entity Framework Core
-- JWT Authentication
-- SignalR for real-time chat
+## Architecture 
+Filmder uses a **layered architecture** focused on separation of concerns and testability.
 
-## Setup
+## What we Learned
+- Designing a maintainable API using controllers + services + repositories.
+- Implementing secure identity flows with JWT and role-aware access patterns.
+- Balancing feature complexity (real-time chat, games, recommendations) with clean separation of concerns.
+- Integrating external systems safely, including TMDB/Gemini and Supabase bucket storage for user media.
+- Improving resilience with middleware-driven error handling, logging, and request throttling.
+- Writing testable components and unit tests around services/controllers.
 
-Clone and restore dependencies:
-```bash
-git clone <repository-url>
-cd Filmder
-dotnet restore
-```
-
-Run database migrations:
-```bash
-dotnet ef database update
-```
-
-Start the application:
-```bash
-dotnet run
-```
-
-API runs at `http://localhost:5144`
-
-## API Endpoints
-
-**Auth**
-- POST `/register` - Create account
-- POST `/login` - Get JWT token
-
-**Groups**
-- POST `/api/group/create` - Create group
-- GET `/api/group/mine` - List your groups
-
-**Chat**
-- WebSocket: `/chatHub`
-
-## Configuration
-
-Set these in `appsettings.Development.json`:
-- Connection string for SQLite
-- TokenKey (minimum 64 characters)
-
-## Database Models
-
-- AppUser: User accounts
-- Movie: Film catalog
-- Group: Movie groups
-- GroupMember: Group membership
-- Message: Chat messages
+## Future Improvements
+- Add a production CI/CD pipeline (build, test, security scan, deploy).
+- Introduce Redis caching and background workers for heavy recommendation workloads.
+- Add distributed tracing/metrics dashboards for observability.
+- Expand integration/contract tests for external APIs and storage adapters.
+- Provide Docker Compose for one-command local full-stack setup.
