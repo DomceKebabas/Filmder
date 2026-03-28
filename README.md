@@ -1,5 +1,5 @@
 
-## Overview
+# Overview
 **Filmder** is a social movie platform backend designed to help groups decide what to watch faster.
 #Project Demo: https://youtu.be/1tPNNiYGozk
 
@@ -50,7 +50,7 @@ Filmder uses a **layered architecture** focused on separation of concerns and te
 - Expand integration/contract tests for external APIs and storage adapters.
 - Provide Docker Compose for one-command local full-stack setup.
 
-## ------------------------Setup--------------------
+# Setup
 
 ## Prerequisites
 - .NET 9 SDK
@@ -109,6 +109,3 @@ dotnet run --project Filmder
 cd Filmder
 dotnet test
 ```
-```
-
----
