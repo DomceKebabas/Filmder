@@ -49,3 +49,66 @@ Filmder uses a **layered architecture** focused on separation of concerns and te
 - Add distributed tracing/metrics dashboards for observability.
 - Expand integration/contract tests for external APIs and storage adapters.
 - Provide Docker Compose for one-command local full-stack setup.
+
+## ------------------------Setup--------------------
+
+## Prerequisites
+- .NET 9 SDK
+- PostgreSQL database
+- A Supabase account
+- A Gemini API key
+- A TMDB API key
+- An SMTP email provider (Gmail works)
+
+## Required Configuration
+
+The app uses `appsettings.Development.json` (gitignored) for secrets.
+Create this file in the `Filmder/Filmder/` directory:
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": ""
+  },
+  "TokenKey": "",
+  "Gemini": {
+    "ApiKey": ""
+  },
+  "TmdbApiKey": "",
+  "EmailSettings": {
+    "SenderEmail": "",
+    "SenderPassword": ""
+  },
+  "Supabase": {
+    "Url": "",
+    "Key": "",
+    "Buckets": {
+      "ProfilePictures": ""
+    }
+  }
+}
+```
+
+## Running Locally
+```bash
+# Clone the repo
+git clone https://github.com/DomceKebabas/Filmder
+cd filmder/Filmder
+
+# Apply database migrations
+dotnet ef database update --project Filmder
+
+# Run the API
+dotnet run --project Filmder
+
+# Swagger UI available at:
+# http://localhost:5144/swagger
+```
+
+## Running Tests
+```bash
+cd Filmder
+dotnet test
+```
+```
+
+---
